@@ -4,7 +4,7 @@ import {
   getAllDepartments, createDepartment, updateDepartment, deleteDepartment,
   getAllEmployees, createEmployee, updateEmployee, deleteEmployee,
   getMyProfile, updateMyProfile,
-  getAllBranches, createBranch, updateBranch, deleteBranch, getBranchDepartments
+  getAllBranches, createBranch, updateBranch, deleteBranch, getBranchDepartments, getBranchDeleteImpact
 } from '../../api/hrmsApi'
 import AdminLeaveManagementPanel from './AdminLeaveManagementPanel'
 import AdminLeaveRequestsPanel from './AdminLeaveRequestsPanel'
@@ -137,13 +137,33 @@ function BranchesPanel() {
     })
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this branch?')) return
+  const handleDelete = async (branch) => {
     try {
-      await deleteBranch(id)
+      // Fetch the delete impact first
+      const res = await getBranchDeleteImpact(branch.id)
+      const { departmentCount, employeeCount } = res.data.data
+
+      // Build the warning message based on whether the branch has content
+      let message
+      if (departmentCount === 0 && employeeCount === 0) {
+        // Empty branch - lighter message
+        message = `Delete "${branch.name}"? It has no departments or employees.`
+      } else {
+        // Branch with content - detailed warning
+        message = `"${branch.name}" has ${departmentCount} department(s) and ${employeeCount} employee(s).\n\n` +
+          `Deleting this branch will permanently remove all ${departmentCount} department(s), ` +
+          `and all ${employeeCount} employee(s) will become unassigned (no department, no branch) ` +
+          `until reassigned by Admin.\n\nContinue?`
+      }
+
+      const confirmed = window.confirm(message)
+      if (!confirmed) return
+
+      // Proceed with deletion only after confirmation
+      await deleteBranch(branch.id)
       await load()
     } catch (err) {
-      setError(err.response?.data?.message || 'Delete failed.')
+      setError(err.response?.data?.message || 'Failed to delete branch.')
     }
   }
 
@@ -226,7 +246,7 @@ function BranchesPanel() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDelete(b.id)}
+                            onClick={() => handleDelete(b)}
                             className="p-xs hover:bg-error-container hover:text-error transition-colors rounded text-on-surface-variant material-symbols-outlined text-[20px]"
                             title="Delete"
                           >

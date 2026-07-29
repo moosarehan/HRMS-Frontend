@@ -92,9 +92,9 @@ function DepartmentPanel() {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow p-lg text-center">
-          <span className="material-symbols-outlined text-[48px] text-on-surface-variant mb-sm">apartment</span>
-          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">No Department Assigned</h2>
-          <p className="text-body-md text-on-surface-variant">Contact Admin — your department was deleted.</p>
+          <span className="material-symbols-outlined text-[48px] text-error mb-sm">domain_disabled</span>
+          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">Not Part of Any Department</h2>
+          <p className="text-body-md text-on-surface-variant">Your department has been deleted or you have been unassigned. Please contact your administrator for reassignment.</p>
         </div>
       </div>
     )
@@ -158,25 +158,57 @@ function DepartmentPanel() {
 }
 
 function BranchPanel() {
-  const [branches, setBranches] = useState([])
+  const [profile, setProfile] = useState(null)
+  const [branch, setBranch] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getAllBranches()
-      .then(res => setBranches(res.data.data ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    const load = async () => {
+      try {
+        const profileRes = await getMyProfile()
+        setProfile(profileRes.data.data)
+        
+        // If employee has no branch assigned, show appropriate message
+        if (!profileRes.data.data?.branchId) {
+          setLoading(false)
+          return
+        }
+        
+        // Get all branches and find the one matching user's branchId
+        const branchesRes = await getAllBranches()
+        const myBranch = branchesRes.data.data?.find(b => b.id === profileRes.data.data.branchId)
+        setBranch(myBranch || null)
+      } catch (err) {
+        console.error('Failed to load branch', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
   }, [])
 
   if (loading) return <div className="text-center py-lg text-on-surface-variant">Loading branch info...</div>
 
-  const branch = branches[0]
+  // If employee has no branch assigned
+  if (!profile?.branchId) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow p-lg text-center">
+          <span className="material-symbols-outlined text-[48px] text-error mb-sm">location_off</span>
+          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">Not Part of Any Branch</h2>
+          <p className="text-body-md text-on-surface-variant">Your branch has been deleted or you have been unassigned. Please contact your administrator for reassignment.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If branch data couldn't be loaded
   if (!branch) return (
     <div className="max-w-3xl mx-auto">
       <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow p-lg text-center">
-        <span className="material-symbols-outlined text-[48px] text-on-surface-variant mb-sm">account_tree</span>
-        <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">No Branch Assigned</h2>
-        <p className="text-body-md text-on-surface-variant">You are not currently assigned to any branch. Contact an administrator.</p>
+        <span className="material-symbols-outlined text-[48px] text-error mb-sm">location_off</span>
+        <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">Branch No Longer Exists</h2>
+        <p className="text-body-md text-on-surface-variant">Your branch has been deleted. Please contact your administrator for further assistance.</p>
       </div>
     </div>
   )

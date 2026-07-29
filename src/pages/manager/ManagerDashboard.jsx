@@ -97,9 +97,9 @@ function DepartmentPanel() {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow p-lg text-center">
-          <span className="material-symbols-outlined text-[48px] text-on-surface-variant mb-sm">apartment</span>
-          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">No Department Assigned</h2>
-          <p className="text-body-md text-on-surface-variant">You are not currently assigned to any department. Contact an administrator.</p>
+          <span className="material-symbols-outlined text-[48px] text-error mb-sm">domain_disabled</span>
+          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">Not Part of Any Department</h2>
+          <p className="text-body-md text-on-surface-variant">Your department has been deleted or you have been unassigned. Please contact your administrator for reassignment.</p>
         </div>
       </div>
     )
@@ -520,21 +520,16 @@ function BranchPanel() {
         const profileRes = await getMyProfile()
         setProfile(profileRes.data.data)
         
-        // If Manager has no department, they have no branch either
-        if (!profileRes.data.data?.departmentId) {
+        // If manager has no branch assigned, show appropriate message
+        if (!profileRes.data.data?.branchId) {
           setLoading(false)
           return
         }
         
-        // Get department to find the branch
-        const deptRes = await getAllDepartments()
-        const myDept = deptRes.data.data?.find(d => d.id === profileRes.data.data.departmentId)
-        
-        if (myDept?.branchId) {
-          const branchRes = await getAllBranches()
-          const myBranch = branchRes.data.data?.find(b => b.id === myDept.branchId)
-          setBranch(myBranch || null)
-        }
+        // Get all branches and find the one matching user's branchId
+        const branchesRes = await getAllBranches()
+        const myBranch = branchesRes.data.data?.find(b => b.id === profileRes.data.data.branchId)
+        setBranch(myBranch || null)
       } catch (err) {
         console.error('Failed to load branch', err)
       } finally {
@@ -546,27 +541,27 @@ function BranchPanel() {
 
   if (loading) return <div className="text-center py-lg text-on-surface-variant">Loading branch info...</div>
 
-  // If Manager has no department assigned, show specific message
-  if (!profile?.departmentId) {
+  // If manager has no branch assigned
+  if (!profile?.branchId) {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow p-lg text-center">
-          <span className="material-symbols-outlined text-[48px] text-on-surface-variant mb-sm">account_tree</span>
-          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">No Branch Assigned</h2>
-          <p className="text-body-md text-on-surface-variant">You haven't been assigned to any department. Contact the Admin.</p>
+          <span className="material-symbols-outlined text-[48px] text-error mb-sm">location_off</span>
+          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">Not Part of Any Branch</h2>
+          <p className="text-body-md text-on-surface-variant">Your branch has been deleted or you have been unassigned. Please contact your administrator for reassignment.</p>
         </div>
       </div>
     )
   }
 
-  // If department exists but no branch found
+  // If branch data couldn't be loaded
   if (!branch) {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow p-lg text-center">
-          <span className="material-symbols-outlined text-[48px] text-on-surface-variant mb-sm">account_tree</span>
-          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">No Branch Found</h2>
-          <p className="text-body-md text-on-surface-variant">Your department does not have an associated branch. Contact an administrator.</p>
+          <span className="material-symbols-outlined text-[48px] text-error mb-sm">location_off</span>
+          <h2 className="text-headline-md font-headline-md text-on-surface mb-xs">Branch No Longer Exists</h2>
+          <p className="text-body-md text-on-surface-variant">Your branch has been deleted. Please contact your administrator for further assistance.</p>
         </div>
       </div>
     )
