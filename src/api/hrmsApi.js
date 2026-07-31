@@ -48,3 +48,32 @@ export const approveLeaveRequest = (leaveRequestId) => api.put(`/leave/requests/
 export const rejectLeaveRequest = (leaveRequestId, data) => api.put(`/leave/requests/${leaveRequestId}/reject`, data)
 export const getEmployeeLeaveHistory = (employeeId) => api.get(`/leave/requests/history/employee/${employeeId}`)
 export const getAllLeaves = () => api.get('/leave/requests/all')
+
+// --- Shifts (ShiftController) ---
+export const getAllShifts = () => api.get('/shift')
+export const createShift = (data) => api.post('/shift', data)
+export const updateShift = (id, data) => api.put(`/shift/${id}`, data)
+export const deleteShift = (id) => api.delete(`/shift/${id}`)
+
+// --- Employee Shift Assignment (EmployeeController) ---
+export const assignEmployeeShift = (employeeId, shiftId) => api.put(`/employee/${employeeId}/shift`, { shiftId })
+
+// --- Working Days (WorkingDaysController) ---
+export const getEmployeeWorkingDays = (employeeId) => api.get(`/workingdays/employee/${employeeId}`)
+export const updateEmployeeWorkingDays = (employeeId, data) => api.put(`/workingdays/employee/${employeeId}`, data)
+
+// --- Attendance (AttendanceController) ---
+export const getTodayAttendance = () => api.get('/attendance/today')
+export const getEmployeeAttendance = (employeeId, date) => api.get(`/attendance/employee/${employeeId}?date=${date}`)
+export const getAttendanceByDateRange = (startDate, endDate) => api.get(`/attendance/range?start=${startDate}&end=${endDate}`)
+export const markAttendance = (employeeId, data) => api.post(`/attendance/employee/${employeeId}`, data)
+export const getAttendanceStats = (date) => api.get(`/attendance/stats?date=${date}`)
+
+export const getMyTodayAttendance = () => api.get('/attendance/my-today')
+export const getMyAttendanceHistory = (startDate, endDate) => api.get('/attendance/my-history', { params: { startDate, endDate } })
+export const clockIn = () => api.post('/attendance/clock-in')
+export const clockOut = (payload) => api.post('/attendance/clock-out', payload)
+
+export const getAdminTimesheet = (date) => api.get('/attendance/admin/timesheet', { params: { date } })
+export const approveEmergencyClockOut = (attendanceId) => api.put(`/attendance/admin/emergency-clock-out/${attendanceId}/approve`)
+export const rejectEmergencyClockOut = (attendanceId) => api.put(`/attendance/admin/emergency-clock-out/${attendanceId}/reject`)
