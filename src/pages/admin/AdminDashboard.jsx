@@ -8,11 +8,15 @@ import {
 } from '../../api/hrmsApi'
 import AdminLeaveManagementPanel from './AdminLeaveManagementPanel'
 import AdminLeaveRequestsPanel from './AdminLeaveRequestsPanel'
+import AttendanceManagement from './AttendanceManagement'
+import AttendanceSheetPanel from './AttendanceSheetPanel'
 
 const NAV = [
   { key: 'branches',    label: 'Branches',        icon: 'account_tree'},
   { key: 'departments', label: 'Departments',     icon: 'apartment' },
   { key: 'employees',   label: 'User Management', icon: 'group'     },
+  { key: 'attendance',   label: 'Attendance Management', icon: 'event_available' },
+  { key: 'attendance-sheet', label: 'Attendance Sheet', icon: 'fact_check' },
   { key: 'leave-management', label: 'Leave Management', icon: 'calendar_today' },
   { key: 'leave-requests', label: 'Leave Requests', icon: 'assignment' },
   { key: 'profile',     label: 'My Profile',      icon: 'person'    },
@@ -50,6 +54,14 @@ export default function AdminDashboard() {
       title: 'User Management',
       subtitle: 'Manage all employee accounts, roles, departments, and salaries.',
     },
+    attendance: {
+      title: 'Attendance Management',
+      subtitle: 'Manage shifts, employee assignments, and working days across all branches.',
+    },
+    'attendance-sheet': {
+      title: 'Attendance Sheet',
+      subtitle: 'Monitor daily attendance across all employees and branches.',
+    },
     'leave-management': {
       title: 'Leave Management',
       subtitle: 'Create leave periods and allocate employee leave quotas across the organization.',
@@ -75,6 +87,8 @@ export default function AdminDashboard() {
       {activeKey === 'branches'    && <BranchesPanel    />}
       {activeKey === 'departments' && <DepartmentsPanel />}
       {activeKey === 'employees'   && <EmployeesPanel   />}
+      {activeKey === 'attendance'  && <AttendanceManagement />}
+      {activeKey === 'attendance-sheet' && <AttendanceSheetPanel />}
       {activeKey === 'leave-management' && <AdminLeaveManagementPanel />}
       {activeKey === 'leave-requests' && <AdminLeaveRequestsPanel />}
       {activeKey === 'profile'     && <ProfilePanel     />}
