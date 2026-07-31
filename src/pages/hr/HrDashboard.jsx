@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import DashboardLayout from '../../components/DashboardLayout.jsx'
 import LeavePanel from '../../components/LeavePanel'
+import EmployeeAttendanceView from '../../components/EmployeeAttendanceView'
 import { 
   getAllEmployees, 
   getAllDepartments, 
@@ -17,6 +18,7 @@ const NAV = [
   { key: 'branch',     label: 'My Branch',           icon: 'account_tree' },
   { key: 'department', label: 'My Department',       icon: 'apartment' },
   { key: 'employees',  label: 'Employees & Managers', icon: 'group'     },
+  { key: 'attendance', label: 'Attendance',          icon: 'fact_check' },
   { key: 'leave',      label: 'Leave',               icon: 'calendar_today' },
   { key: 'profile',    label: 'My Profile',          icon: 'person'    },
   { key: 'settings',   label: 'Logout',              icon: 'logout'    },
@@ -37,6 +39,7 @@ export default function HrDashboard() {
       case 'branch': return 'My Branch'
       case 'department': return 'My Department'
       case 'employees': return 'Employees & Managers'
+      case 'attendance': return 'My Attendance History'
       case 'leave': return 'Leave'
       case 'profile': return 'My Profile'
       default: return 'HR Dashboard'
@@ -48,6 +51,7 @@ export default function HrDashboard() {
       case 'branch': return 'View your branch details (read-only)'
       case 'department': return 'View your department details (read-only)'
       case 'employees': return 'Create, manage, and remove employee and manager accounts.'
+      case 'attendance': return 'View your daily attendance records and history.'
       case 'leave': return 'Apply for leave and view your leave requests.'
       case 'profile': return 'Manage your personal information'
       default: return ''
@@ -65,6 +69,7 @@ export default function HrDashboard() {
       {activeKey === 'branch' && <BranchPanel />}
       {activeKey === 'department' && <DepartmentPanel sharedEmployees={sharedEmployees} onEmployeesLoad={setSharedEmployees} />}
       {activeKey === 'employees' && <EmployeesPanel sharedEmployees={sharedEmployees} onEmployeesLoad={setSharedEmployees} />}
+      {activeKey === 'attendance' && <EmployeeAttendanceView />}
       {activeKey === 'leave' && <LeavePanel />}
       {activeKey === 'profile' && <ProfilePanel />}
     </DashboardLayout>
