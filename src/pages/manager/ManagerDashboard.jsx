@@ -3,11 +3,13 @@ import DashboardLayout from '../../components/DashboardLayout.jsx'
 import { getAllEmployees, getAllDepartments, getMyProfile, updateMyProfile, getAllBranches } from '../../api/hrmsApi'
 import { useAuth } from '../../context/AuthContext.jsx'
 import LeavePanel from '../../components/LeavePanel'
+import EmployeeAttendanceView from '../../components/EmployeeAttendanceView'
 
 const NAV = [
   { key: 'branch',     label: 'My Branch',     icon: 'account_tree' },
   { key: 'department', label: 'My Department', icon: 'apartment' },
   { key: 'team',       label: 'Team Members',  icon: 'groups'    },
+  { key: 'attendance', label: 'Attendance',    icon: 'fact_check' },
   { key: 'leave',      label: 'Leave',         icon: 'calendar_today' },
   { key: 'profile',    label: 'My Profile',    icon: 'person'    },
   { key: 'settings',   label: 'Logout',        icon: 'logout'    },
@@ -22,6 +24,7 @@ export default function ManagerDashboard() {
       case 'branch': return 'My Branch'
       case 'department': return 'My Department'
       case 'team': return 'Team Members'
+      case 'attendance': return 'My Attendance History'
       case 'leave': return 'Leave'
       case 'profile': return 'My Profile'
       default: return 'Manager Dashboard'
@@ -33,6 +36,7 @@ export default function ManagerDashboard() {
       case 'branch': return 'View your branch details (read-only)'
       case 'department': return 'View your department details (read-only)'
       case 'team': return 'View members of your department. Read-only — contact HR or Admin for changes.'
+      case 'attendance': return 'View your daily attendance records and history.'
       case 'leave': return 'Apply for leave and view your leave requests.'
       case 'profile': return 'Manage your personal information'
       default: return ''
@@ -50,6 +54,7 @@ export default function ManagerDashboard() {
       {activeKey === 'branch' && <BranchPanel />}
       {activeKey === 'department' && <DepartmentPanel />}
       {activeKey === 'team' && <TeamPanel />}
+      {activeKey === 'attendance' && <EmployeeAttendanceView />}
       {activeKey === 'leave' && <LeavePanel />}
       {activeKey === 'profile' && <ProfilePanel />}
     </DashboardLayout>
