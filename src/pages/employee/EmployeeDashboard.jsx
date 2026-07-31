@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import DashboardLayout from '../../components/DashboardLayout.jsx'
 import { getMyProfile, updateMyProfile, getAllBranches, getAllDepartments } from '../../api/hrmsApi'
 import LeavePanel from '../../components/LeavePanel'
+import EmployeeAttendanceView from '../../components/EmployeeAttendanceView'
 
 const NAV = [
   { key: 'department', label: 'My Department', icon: 'apartment' },
   { key: 'branch',     label: 'My Branch',     icon: 'account_tree' },
+  { key: 'attendance', label: 'Attendance',    icon: 'fact_check' },
   { key: 'leave',      label: 'Leave',         icon: 'calendar_today' },
   { key: 'profile',    label: 'My Profile',    icon: 'person'  },
   { key: 'settings',   label: 'Logout',        icon: 'logout'  },
@@ -18,6 +20,7 @@ export default function EmployeeDashboard() {
     switch(activeKey) {
       case 'department': return 'My Department'
       case 'branch': return 'My Branch'
+      case 'attendance': return 'My Attendance History'
       case 'leave': return 'Leave'
       case 'profile': return 'My Profile'
       default: return 'Employee Dashboard'
@@ -28,6 +31,7 @@ export default function EmployeeDashboard() {
     switch(activeKey) {
       case 'department': return 'View your department details (read-only)'
       case 'branch': return 'View your branch details (read-only)'
+      case 'attendance': return 'View your daily attendance records and history.'
       case 'leave': return 'Apply for leave and view your leave requests.'
       case 'profile': return 'Manage your personal information'
       default: return ''
@@ -44,6 +48,7 @@ export default function EmployeeDashboard() {
     >
       {activeKey === 'department' && <DepartmentPanel />}
       {activeKey === 'branch' && <BranchPanel />}
+      {activeKey === 'attendance' && <EmployeeAttendanceView />}
       {activeKey === 'leave' && <LeavePanel />}
       {activeKey === 'profile' && <ProfilePanel />}
     </DashboardLayout>
