@@ -382,16 +382,7 @@ export default function EmployeeAttendanceView() {
       </div>
 
       {/* Main Status Cards */}
-      {!hasShift ? (
-        /* Null Shift State Banner (Rule 4) */
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center space-y-2">
-          <span className="material-symbols-outlined text-[48px] text-amber-600">warning</span>
-          <h4 className="text-xl font-bold text-amber-900">Shift not assigned. Contact Admin.</h4>
-          <p className="text-amber-700 text-sm">
-            You do not currently have an active shift assigned to your account. Please reach out to your Administrator to assign a shift schedule.
-          </p>
-        </div>
-      ) : isOnLeave ? (
+      {isOnLeave ? (
         /* On Leave State — Bento Grid Layout */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-lg">
           {/* Main Leave Card */}
@@ -510,6 +501,15 @@ export default function EmployeeAttendanceView() {
               </div>
             </div>
           </div>
+        </div>
+      ) : !hasShift ? (
+        /* Null Shift State Banner */
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center space-y-2">
+          <span className="material-symbols-outlined text-[48px] text-amber-600">warning</span>
+          <h4 className="text-xl font-bold text-amber-900">Shift not assigned. Contact Admin.</h4>
+          <p className="text-amber-700 text-sm">
+            You do not currently have an active shift assigned to your account. Please reach out to your Administrator to assign a shift schedule.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-lg">
