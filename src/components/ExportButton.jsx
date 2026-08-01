@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
-function ExportButton({ branch, department, search, date }) {
+function ExportButton({ branch, department, search, date, activeView }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { token } = useAuth();
@@ -20,7 +20,8 @@ function ExportButton({ branch, department, search, date }) {
         branch: branch || "",
         department: department || "",
         search: search || "",
-        date: date || ""
+        date: date || "",
+        status: activeView || "all"
       });
 
       const res = await fetch(`${API_BASE}/api/attendance/export?${params.toString()}`, {

@@ -384,6 +384,7 @@ export default function AttendanceSheetPanel({
             department={departmentFilter !== 'all' ? departmentFilter : undefined}
             search={searchTerm}
             date={selectedDate}
+            activeView={activeView}
           />
         </div>
       </div>
