@@ -105,6 +105,7 @@ export default function EmployeeAttendanceView() {
   const shiftName = todayData?.shiftName || profile?.shiftName || 'N/A'
   const attendanceRecord = todayData?.todayAttendance
   const isOffDay = hasShift && !todayData?.isWorkingDayToday
+  const isOnLeave = todayData?.isOnLeaveToday
 
   // Weekly stats: calculate total hours worked this week from real data
   const weeklyStats = useMemo(() => {
@@ -389,6 +390,70 @@ export default function EmployeeAttendanceView() {
           <p className="text-amber-700 text-sm">
             You do not currently have an active shift assigned to your account. Please reach out to your Administrator to assign a shift schedule.
           </p>
+        </div>
+      ) : isOnLeave ? (
+        /* On Leave State — Bento Grid Layout */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-lg">
+          {/* Main Leave Card */}
+          <div className="lg:col-span-8 bg-surface-container-lowest border border-surface-container-highest rounded-xl p-xl relative overflow-hidden flex flex-col justify-center min-h-[320px] shadow-sm">
+            {/* Subtle background decoration */}
+            <div className="absolute -right-16 -top-16 w-64 h-64 bg-tertiary-fixed opacity-10 rounded-full blur-3xl"></div>
+            <div className="absolute -left-16 -bottom-16 w-48 h-48 bg-primary-fixed opacity-10 rounded-full blur-2xl"></div>
+            <div className="relative z-10 flex flex-col items-center text-center">
+              <div className="w-20 h-20 bg-tertiary-container rounded-full flex items-center justify-center mb-md shadow-sm">
+                <span className="material-symbols-outlined text-tertiary text-[40px]">sick</span>
+              </div>
+              <h3 className="text-headline-lg font-headline-lg text-on-surface mb-xs">Enjoy your day off!</h3>
+              <p className="text-on-surface-variant font-body-lg max-w-lg mb-lg">
+                You are on approved leave today. No clock-in is required.
+              </p>
+              
+              {todayData?.leaveType && (
+                <div className="bg-tertiary-container px-lg py-sm rounded-full border border-tertiary-container-highest flex items-center gap-sm mb-md">
+                  <span className="material-symbols-outlined text-on-tertiary-container">event_available</span>
+                  <span className="font-label-md text-on-tertiary-container">{todayData.leaveType}</span>
+                </div>
+              )}
+              
+              <div className="bg-surface-container-low px-lg py-sm rounded-full border border-surface-container-highest flex items-center gap-sm mb-lg">
+                <span className="material-symbols-outlined text-primary">event</span>
+                <span className="font-label-md text-on-surface">Today, {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              </div>
+              <div className="inline-flex items-center gap-sm px-xl py-md bg-surface-container-highest text-outline font-label-md rounded-lg border border-outline-variant">
+                <span className="material-symbols-outlined">block</span>
+                No Active Shift Today
+              </div>
+            </div>
+          </div>
+
+          {/* Side Stats Panel */}
+          <div className="lg:col-span-4 flex flex-col gap-lg">
+            <div className="bg-surface-container-lowest border border-surface-container-highest rounded-xl p-lg flex-1 shadow-sm">
+              <h4 className="font-label-md text-on-surface-variant uppercase mb-md tracking-wider">This Week's Stats</h4>
+              <div className="space-y-md">
+                <div className="flex justify-between items-center">
+                  <span className="text-on-surface-variant">Hours Logged</span>
+                  <span className="font-label-md text-on-surface">{weeklyStats.totalHours.toFixed(1)} / {weeklyStats.expectedHours}h</span>
+                </div>
+                <div className="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-primary h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min((weeklyStats.totalHours / weeklyStats.expectedHours) * 100, 100)}%` }}
+                  ></div>
+                </div>
+                <div className="grid grid-cols-2 gap-sm pt-sm">
+                  <div className="bg-surface-container-low p-sm rounded-lg text-center">
+                    <p className="text-label-sm text-on-surface-variant">On Time</p>
+                    <p className="font-headline-md text-primary">{weeklyStats.onTimePercent}%</p>
+                  </div>
+                  <div className="bg-surface-container-low p-sm rounded-lg text-center">
+                    <p className="text-label-sm text-on-surface-variant">Overtime</p>
+                    <p className="font-headline-md text-secondary">{weeklyStats.overtime}h</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       ) : isOffDay ? (
         /* Off Day State — Bento Grid Layout */
