@@ -121,11 +121,12 @@ export default function AttendanceSheetPanel({
 
   // Compute stats
   const stats = useMemo(() => {
-    if (!timesheetData) return { present: 0, absent: 0, emergency: 0 };
+    if (!timesheetData) return { present: 0, absent: 0, emergency: 0, holiday: 0 };
     return {
       present: timesheetData.presentEmployees?.length || 0,
       absent: timesheetData.absentEmployees?.length || 0,
-      emergency: timesheetData.pendingEmergencyClockOutRequests?.length || 0
+      emergency: timesheetData.pendingEmergencyClockOutRequests?.length || 0,
+      holiday: timesheetData.holidayEmployees?.length || 0
     };
   }, [timesheetData]);
 
@@ -150,7 +151,7 @@ export default function AttendanceSheetPanel({
       statusColor: 'bg-red-100 text-red-800'
     }));
 
-    // Merge: present employees + absent employees
+    // Merge: present employees + absent employees (holiday employees are shown separately)
     const combined = [...presentMap.values(), ...absentList];
 
     // Enrich with branch/department info from allEmployees
@@ -174,6 +175,7 @@ export default function AttendanceSheetPanel({
     // View filter
     if (activeView === 'present') list = list.filter(e => e.status === 'present');
     if (activeView === 'absent') list = list.filter(e => e.status === 'absent');
+    // Note: holiday view shows a separate panel, not filtered employees
 
     // Search
     if (searchTerm) {
@@ -280,7 +282,7 @@ export default function AttendanceSheetPanel({
 
       {/* Attendance Summary Cards */}
       {showSummaryCards && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-gutter">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
           <AttendanceSummaryCard
             title="Present"
             count={stats.present}
@@ -300,6 +302,16 @@ export default function AttendanceSheetPanel({
             iconColor="text-red-600"
             active={activeView === 'absent'}
             onClick={() => setActiveView(activeView === 'absent' ? 'all' : 'absent')}
+          />
+          <AttendanceSummaryCard
+            title="Holiday"
+            count={stats.holiday}
+            icon="event_available"
+            bgColor="bg-blue-100"
+            textColor="text-blue-900"
+            iconColor="text-blue-600"
+            active={activeView === 'holiday'}
+            onClick={() => setActiveView(activeView === 'holiday' ? 'all' : 'holiday')}
           />
           <AttendanceSummaryCard
             title="Emergency Requests"
@@ -376,6 +388,57 @@ export default function AttendanceSheetPanel({
         </div>
       </div>
 
+      {/* Holiday Panel (shown when holiday view is active) */}
+      {activeView === 'holiday' && (
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow overflow-hidden">
+          <div className="px-md py-md bg-blue-50 border-b border-outline-variant flex items-center gap-sm">
+            <span className="material-symbols-outlined text-blue-600 text-[24px]">event_available</span>
+            <h3 className="text-label-md font-bold text-blue-900">Holiday Employees</h3>
+            <span className="ml-auto bg-blue-200 text-blue-800 text-label-sm font-bold px-xs py-0.5 rounded-full">
+              {timesheetData?.holidayEmployees?.length || 0}
+            </span>
+          </div>
+
+          {!timesheetData?.holidayEmployees?.length ? (
+            <div className="text-center py-lg text-on-surface-variant">
+              <span className="material-symbols-outlined text-[48px] mb-xs block text-outline">event_busy</span>
+              <p className="text-body-md">No employees on holiday for this date.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-outline-variant">
+              {timesheetData.holidayEmployees.map((emp, idx) => (
+                <div key={`${emp.employeeId}-${idx}`} className="px-md py-md flex items-center justify-between hover:bg-surface-container-low transition-colors">
+                  <div className="flex items-center gap-sm flex-1">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-blue-700 font-bold text-xs">{emp.employeeName?.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-label-md font-bold text-on-surface">{emp.employeeName}</p>
+                      <p className="text-label-sm text-on-surface-variant">
+                        {emp.role} • {emp.departmentName || 'No Department'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-sm">
+                    <div className="text-right">
+                      <p className="text-label-sm font-medium text-on-surface">
+                        {emp.holidayReason || 'Holiday'}
+                      </p>
+                      {emp.leaveType && (
+                        <p className="text-label-xs text-blue-700 bg-blue-100 px-xs py-0.5 rounded-full inline-block">
+                          {emp.leaveType}
+                        </p>
+                      )}
+                    </div>
+                    <span className="material-symbols-outlined text-blue-600">event_available</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Emergency Requests Panel (shown when emergency view is active) */}
       {activeView === 'emergency' && (
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow overflow-hidden">
@@ -440,7 +503,7 @@ export default function AttendanceSheetPanel({
       )}
 
       {/* Employee Attendance Table (shown for all/present/absent views) */}
-      {activeView !== 'emergency' && (
+      {activeView !== 'emergency' && activeView !== 'holiday' && (
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
