@@ -76,9 +76,15 @@ const ShiftCard = ({ shift, onAdd, onEdit, onDelete }) => {
       <div>
         <h3 className={`${config.textColor} font-bold text-lg`}>{shift.name}</h3>
         {hasTime && (
-          <div className={`${config.textColor} text-sm flex items-center gap-1 mt-1`}>
-            <Icon name="schedule" className="text-sm" />
-            <span>{startTime} - {endTime}</span>
+          <div className={`${config.textColor} text-sm space-y-1 mt-1`}>
+            <div className="flex items-center gap-1">
+              <Icon name="schedule" className="text-sm" />
+              <span>{startTime} - {endTime}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs opacity-90">
+              <Icon name="timer" className="text-xs" />
+              <span>Late Allowed: {shift.lateThresholdMinutes !== undefined && shift.lateThresholdMinutes !== null ? shift.lateThresholdMinutes : 15} mins</span>
+            </div>
           </div>
         )}
       </div>
@@ -724,7 +730,8 @@ export default function AttendanceManagement() {
 
   const handleSaveShift = async (shiftId, data) => {
     try {
-      const payload = { startTime: data.startTime, endTime: data.endTime, limit: data.limit, lateThresholdMinutes: data.lateThresholdMinutes || 0 };
+      const lateMins = data.lateThresholdMinutes !== undefined && data.lateThresholdMinutes !== null && data.lateThresholdMinutes !== '' ? parseInt(data.lateThresholdMinutes) : 15;
+      const payload = { startTime: data.startTime, endTime: data.endTime, limit: data.limit, lateThresholdMinutes: isNaN(lateMins) ? 15 : lateMins };
       await updateShift(shiftId, payload);
       await loadShifts();
     } catch (err) {
@@ -735,12 +742,13 @@ export default function AttendanceManagement() {
 
   const handleCreateShift = async (data) => {
     try {
+      const lateMins = data.lateThresholdMinutes !== undefined && data.lateThresholdMinutes !== null && data.lateThresholdMinutes !== '' ? parseInt(data.lateThresholdMinutes) : 15;
       const payload = { 
         name: data.name, 
         startTime: data.startTime, 
         endTime: data.endTime, 
         limit: data.limit,
-        lateThresholdMinutes: data.lateThresholdMinutes || 0
+        lateThresholdMinutes: isNaN(lateMins) ? 15 : lateMins
       };
       await createShift(payload);
       await loadShifts();

@@ -74,22 +74,9 @@ export default function EmployeeAttendanceView() {
     loadData()
   }, [startDate, endDate])
 
-  // Check if employee has ANY assignment by checking if historyData is ever populated
-  // If ALL-TIME history returns no records, employee hasn't been assigned yet
-  const [hasAnyAssignment, setHasAnyAssignment] = useState(true)
-
-  useEffect(() => {
-    // On first load, check all-time history to determine if employee has ever been assigned
-    const checkFirstAssignment = async () => {
-      try {
-        const response = await getMyAttendanceHistory(null, null)
-        setHasAnyAssignment((response.data.data || []).length > 0)
-      } catch (err) {
-        setHasAnyAssignment(true) // Assume assigned if error
-      }
-    }
-    checkFirstAssignment()
-  }, [])
+  // Assignment status comes from the server. An employee may have a shift before
+  // their first attendance row, so history length is not a valid assignment check.
+  const hasAnyAssignment = todayData?.hasEverBeenAssigned ?? false
 
   // Update clock every second
   useEffect(() => {
@@ -269,12 +256,15 @@ export default function EmployeeAttendanceView() {
         }
       }
 
+      // Determine status: check isLate property first (from backend), then fallback to clockIn presence
       const status = record.isLate ? 'Late' : (record.clockIn ? 'Present' : 'Absent')
       let statusColor = 'bg-rose-100 text-rose-800' // Absent default
       if (record.isLate) {
         statusColor = 'bg-amber-100 text-amber-800' // Late
       } else if (record.clockIn) {
         statusColor = 'bg-emerald-100 text-emerald-800' // Present
+      } else {
+        statusColor = 'bg-rose-100 text-rose-800' // Absent - explicitly set
       }
 
       // Get minutes late display

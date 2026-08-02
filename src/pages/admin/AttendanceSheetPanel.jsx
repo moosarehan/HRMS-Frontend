@@ -706,7 +706,7 @@ export default function AttendanceSheetPanel({
               <span className="material-symbols-outlined text-[48px] mb-xs block text-outline">search_off</span>
               <p className="text-body-md">
                 {timesheetData?.noShiftAssignmentsYet
-                  ? "No attendance records found - Assign shifts to employees to enable tracking."
+                  ? "No attendance records exist for this date because no employee had been assigned a shift yet."
                   : timesheetData?.isCompanyOffDay
                   ? "Company schedule day off - No shifts scheduled for any employee today."
                   : "No attendance record exists for the selected date and filters."}
