@@ -67,7 +67,10 @@ export const getTodayAttendance = () => api.get('/attendance/today')
 export const getEmployeeAttendance = (employeeId, date) => api.get(`/attendance/employee/${employeeId}?date=${date}`)
 export const getAttendanceByDateRange = (startDate, endDate) => api.get(`/attendance/range?start=${startDate}&end=${endDate}`)
 export const markAttendance = (employeeId, data) => api.post(`/attendance/employee/${employeeId}`, data)
-export const getAttendanceStats = (date) => api.get(`/attendance/stats?date=${date}`)
+export const getAttendanceStats = (date = null) => {
+  const url = date ? `/attendance/stats?date=${date}` : '/attendance/stats';
+  return api.get(url);
+}
 
 export const getMyTodayAttendance = () => api.get('/attendance/my-today')
 export const getMyAttendanceHistory = (startDate, endDate) => api.get('/attendance/my-history', { params: { startDate, endDate } })

@@ -121,9 +121,10 @@ export default function AttendanceSheetPanel({
 
   // Compute stats
   const stats = useMemo(() => {
-    if (!timesheetData) return { present: 0, absent: 0, emergency: 0, holiday: 0 };
+    if (!timesheetData) return { present: 0, late: 0, absent: 0, emergency: 0, holiday: 0 };
     return {
       present: timesheetData.presentEmployees?.length || 0,
+      late: timesheetData.lateEmployees?.length || 0,
       absent: timesheetData.absentEmployees?.length || 0,
       emergency: timesheetData.pendingEmergencyClockOutRequests?.length || 0,
       holiday: timesheetData.holidayEmployees?.length || 0
@@ -144,6 +145,13 @@ export default function AttendanceSheetPanel({
       });
     });
 
+    const lateList = (timesheetData.lateEmployees || []).map(emp => ({
+      ...emp,
+      status: 'late',
+      statusLabel: 'Late',
+      statusColor: 'bg-amber-100 text-amber-800'
+    }));
+
     const absentList = (timesheetData.absentEmployees || []).map(emp => ({
       ...emp,
       status: 'absent',
@@ -151,8 +159,8 @@ export default function AttendanceSheetPanel({
       statusColor: 'bg-red-100 text-red-800'
     }));
 
-    // Merge: present employees + absent employees (holiday employees are shown separately)
-    const combined = [...presentMap.values(), ...absentList];
+    // Merge: present employees + late employees + absent employees (holiday employees are shown separately)
+    const combined = [...presentMap.values(), ...lateList, ...absentList];
 
     // Enrich with branch/department info from allEmployees
     return combined.map(entry => {
@@ -174,6 +182,7 @@ export default function AttendanceSheetPanel({
 
     // View filter
     if (activeView === 'present') list = list.filter(e => e.status === 'present');
+    if (activeView === 'late') list = list.filter(e => e.status === 'late');
     if (activeView === 'absent') list = list.filter(e => e.status === 'absent');
     // Note: holiday view shows a separate panel, not filtered employees
 
@@ -266,15 +275,15 @@ export default function AttendanceSheetPanel({
       </div>
 
       {/* Company Off Day Alert Banner */}
-      {timesheetData?.isCompanyOffDay && (
+      {timesheetData?.isCompanyOffDay && !timesheetData?.noShiftAssignmentsYet && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-lg text-center space-y-sm ambient-shadow">
           <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
             <span className="material-symbols-outlined text-blue-600 text-[36px]">event_busy</span>
           </div>
           <div>
-            <h2 className="text-headline-sm font-bold text-blue-900">Scheduled Company Off Day</h2>
+            <h2 className="text-headline-sm font-bold text-blue-900">Company Off Day</h2>
             <p className="text-body-md text-blue-700 max-w-md mx-auto mt-xs">
-              Every employee has an off day scheduled for {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.
+              No employees had shift assignments for {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}. This appears to be a company-wide off day.
             </p>
           </div>
         </div>
@@ -282,7 +291,7 @@ export default function AttendanceSheetPanel({
 
       {/* Attendance Summary Cards */}
       {showSummaryCards && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-gutter">
           <AttendanceSummaryCard
             title="Present"
             count={stats.present}
@@ -292,6 +301,16 @@ export default function AttendanceSheetPanel({
             iconColor="text-emerald-600"
             active={activeView === 'present'}
             onClick={() => setActiveView(activeView === 'present' ? 'all' : 'present')}
+          />
+          <AttendanceSummaryCard
+            title="Late"
+            count={stats.late}
+            icon="schedule"
+            bgColor="bg-amber-100"
+            textColor="text-amber-900"
+            iconColor="text-amber-600"
+            active={activeView === 'late'}
+            onClick={() => setActiveView(activeView === 'late' ? 'all' : 'late')}
           />
           <AttendanceSummaryCard
             title="Absent"
@@ -389,6 +408,88 @@ export default function AttendanceSheetPanel({
         </div>
       </div>
 
+      {/* Late Panel (shown when late view is active) */}
+      {activeView === 'late' && (
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow overflow-hidden">
+          <div className="px-md py-md bg-amber-50 border-b border-outline-variant flex items-center gap-sm">
+            <span className="material-symbols-outlined text-amber-600 text-[24px]">schedule</span>
+            <h3 className="text-label-md font-bold text-amber-900">Late Employees</h3>
+            <span className="ml-auto bg-amber-200 text-amber-800 text-label-sm font-bold px-xs py-0.5 rounded-full">
+              {timesheetData?.lateEmployees?.length || 0}
+            </span>
+          </div>
+
+          {!timesheetData?.lateEmployees?.length ? (
+            <div className="text-center py-lg text-on-surface-variant">
+              <span className="material-symbols-outlined text-[48px] mb-xs block text-outline">schedule</span>
+              <p className="text-body-md">No late employees for this date.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-amber-50 border-b border-outline-variant">
+                    <th className="px-md py-sm text-label-sm font-label-sm text-amber-900 uppercase tracking-wider">Employee</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-amber-900 uppercase tracking-wider">Branch</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-amber-900 uppercase tracking-wider">Department</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-amber-900 uppercase tracking-wider">Role</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-amber-900 uppercase tracking-wider">Shift</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-amber-900 uppercase tracking-wider">Clock In</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-amber-900 uppercase tracking-wider">Clock Out</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-amber-900 uppercase tracking-wider">Minutes Late</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant">
+                  {timesheetData.lateEmployees.map((emp, idx) => {
+                    const fullEmp = allEmployees.find(e => e.id === emp.employeeId);
+                    return (
+                      <tr key={`${emp.employeeId}-${idx}`} className="hover:bg-surface-container-low transition-colors">
+                        <td className="px-md py-md">
+                          <div className="flex items-center gap-sm">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                              <span className="text-amber-700 font-bold text-xs">{emp.employeeName?.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div>
+                              <p className="text-label-md font-label-md text-on-surface">{emp.employeeName}</p>
+                              {fullEmp?.email && <p className="text-label-sm text-outline">{fullEmp.email}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-md py-md text-body-md text-on-surface-variant">{fullEmp?.branchName || fullEmp?.branch?.name || 'N/A'}</td>
+                        <td className="px-md py-md text-body-md text-on-surface-variant">{emp.departmentName || 'N/A'}</td>
+                        <td className="px-md py-md">
+                          <span className="inline-block px-xs py-0.5 bg-secondary-fixed text-on-secondary-fixed text-xs font-semibold rounded-full">{emp.role}</span>
+                        </td>
+                        <td className="px-md py-md">
+                          <span className="inline-block px-xs py-0.5 bg-tertiary-fixed text-on-tertiary-fixed text-xs font-semibold rounded-full">
+                            {emp.shiftName || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-md py-md text-body-md text-on-surface-variant">
+                          {emp.clockIn
+                            ? new Date(emp.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : <span className="text-outline italic">Not clocked in</span>
+                          }
+                        </td>
+                        <td className="px-md py-md text-body-md text-on-surface-variant">
+                          {emp.clockOut
+                            ? new Date(emp.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : <span className="text-outline italic">Not clocked out</span>
+                          }
+                        </td>
+                        <td className="px-md py-md text-body-md font-bold text-amber-700">
+                          {emp.minutesLate || 0} min
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Holiday Panel (shown when holiday view is active) */}
       {activeView === 'holiday' && (
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow overflow-hidden">
@@ -406,35 +507,68 @@ export default function AttendanceSheetPanel({
               <p className="text-body-md">No employees on holiday for this date.</p>
             </div>
           ) : (
-            <div className="divide-y divide-outline-variant">
-              {timesheetData.holidayEmployees.map((emp, idx) => (
-                <div key={`${emp.employeeId}-${idx}`} className="px-md py-md flex items-center justify-between hover:bg-surface-container-low transition-colors">
-                  <div className="flex items-center gap-sm flex-1">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <span className="text-blue-700 font-bold text-xs">{emp.employeeName?.charAt(0).toUpperCase()}</span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-label-md font-bold text-on-surface">{emp.employeeName}</p>
-                      <p className="text-label-sm text-on-surface-variant">
-                        {emp.role} • {emp.departmentName || 'No Department'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-sm">
-                    <div className="text-right">
-                      <p className="text-label-sm font-medium text-on-surface">
-                        {emp.holidayReason || 'Holiday'}
-                      </p>
-                      {emp.leaveType && (
-                        <p className="text-label-xs text-blue-700 bg-blue-100 px-xs py-0.5 rounded-full inline-block">
-                          {emp.leaveType}
-                        </p>
-                      )}
-                    </div>
-                    <span className="material-symbols-outlined text-blue-600">event_available</span>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-blue-50 border-b border-outline-variant">
+                    <th className="px-md py-sm text-label-sm font-label-sm text-blue-900 uppercase tracking-wider">Employee</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-blue-900 uppercase tracking-wider">Branch</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-blue-900 uppercase tracking-wider">Department</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-blue-900 uppercase tracking-wider">Role</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-blue-900 uppercase tracking-wider">Shift</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-blue-900 uppercase tracking-wider">Holiday Reason</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-blue-900 uppercase tracking-wider">Leave Type</th>
+                    <th className="px-md py-sm text-label-sm font-label-sm text-blue-900 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant">
+                  {timesheetData.holidayEmployees.map((emp, idx) => {
+                    const fullEmp = allEmployees.find(e => e.id === emp.employeeId);
+                    return (
+                      <tr key={`${emp.employeeId}-${idx}`} className="hover:bg-surface-container-low transition-colors">
+                        <td className="px-md py-md">
+                          <div className="flex items-center gap-sm">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <span className="text-blue-700 font-bold text-xs">{emp.employeeName?.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div>
+                              <p className="text-label-md font-label-md text-on-surface">{emp.employeeName}</p>
+                              {fullEmp?.email && <p className="text-label-sm text-outline">{fullEmp.email}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-md py-md text-body-md text-on-surface-variant">{fullEmp?.branchName || fullEmp?.branch?.name || 'N/A'}</td>
+                        <td className="px-md py-md text-body-md text-on-surface-variant">{emp.departmentName || 'N/A'}</td>
+                        <td className="px-md py-md">
+                          <span className="inline-block px-xs py-0.5 bg-secondary-fixed text-on-secondary-fixed text-xs font-semibold rounded-full">{emp.role}</span>
+                        </td>
+                        <td className="px-md py-md">
+                          <span className="inline-block px-xs py-0.5 bg-tertiary-fixed text-on-tertiary-fixed text-xs font-semibold rounded-full">
+                            {emp.shiftName || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-md py-md text-body-md text-on-surface-variant">
+                          {emp.holidayReason || 'Holiday'}
+                        </td>
+                        <td className="px-md py-md">
+                          {emp.leaveType ? (
+                            <span className="px-xs py-0.5 bg-blue-100 text-blue-800 text-label-sm font-semibold rounded-full inline-block">
+                              {emp.leaveType}
+                            </span>
+                          ) : (
+                            <span className="text-outline italic">N/A</span>
+                          )}
+                        </td>
+                        <td className="px-md py-md">
+                          <span className="px-xs py-0.5 bg-blue-100 text-blue-800 text-label-sm font-bold rounded-full inline-block">
+                            Holiday
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -504,7 +638,7 @@ export default function AttendanceSheetPanel({
       )}
 
       {/* Employee Attendance Table (shown for all/present/absent views) */}
-      {activeView !== 'emergency' && activeView !== 'holiday' && (
+      {activeView !== 'emergency' && activeView !== 'holiday' && activeView !== 'late' && (
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl ambient-shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -570,7 +704,13 @@ export default function AttendanceSheetPanel({
           {filteredEmployees.length === 0 && (
             <div className="text-center py-lg text-on-surface-variant">
               <span className="material-symbols-outlined text-[48px] mb-xs block text-outline">search_off</span>
-              <p className="text-body-md">No employees found matching your filters.</p>
+              <p className="text-body-md">
+                {timesheetData?.noShiftAssignmentsYet
+                  ? "No attendance records found - Assign shifts to employees to enable tracking."
+                  : timesheetData?.isCompanyOffDay
+                  ? "Company schedule day off - No shifts scheduled for any employee today."
+                  : "No attendance record exists for the selected date and filters."}
+              </p>
             </div>
           )}
 

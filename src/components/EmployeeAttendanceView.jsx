@@ -74,6 +74,23 @@ export default function EmployeeAttendanceView() {
     loadData()
   }, [startDate, endDate])
 
+  // Check if employee has ANY assignment by checking if historyData is ever populated
+  // If ALL-TIME history returns no records, employee hasn't been assigned yet
+  const [hasAnyAssignment, setHasAnyAssignment] = useState(true)
+
+  useEffect(() => {
+    // On first load, check all-time history to determine if employee has ever been assigned
+    const checkFirstAssignment = async () => {
+      try {
+        const response = await getMyAttendanceHistory(null, null)
+        setHasAnyAssignment((response.data.data || []).length > 0)
+      } catch (err) {
+        setHasAnyAssignment(true) // Assume assigned if error
+      }
+    }
+    checkFirstAssignment()
+  }, [])
+
   // Update clock every second
   useEffect(() => {
     const clockInterval = setInterval(() => {
@@ -252,8 +269,19 @@ export default function EmployeeAttendanceView() {
         }
       }
 
-      const status = record.clockIn ? 'Present' : 'Absent'
-      const statusColor = record.clockIn ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+      const status = record.isLate ? 'Late' : (record.clockIn ? 'Present' : 'Absent')
+      let statusColor = 'bg-rose-100 text-rose-800' // Absent default
+      if (record.isLate) {
+        statusColor = 'bg-amber-100 text-amber-800' // Late
+      } else if (record.clockIn) {
+        statusColor = 'bg-emerald-100 text-emerald-800' // Present
+      }
+
+      // Get minutes late display
+      let minutesLateDisplay = ''
+      if (record.isLate && record.minutesLate > 0) {
+        minutesLateDisplay = `${record.minutesLate} min${record.minutesLate !== 1 ? 's' : ''} late`
+      }
 
       return {
         id: record.id,
@@ -263,7 +291,9 @@ export default function EmployeeAttendanceView() {
         statusColor,
         clockInTime,
         clockOutTime,
-        hoursStr
+        hoursStr,
+        minutesLateDisplay,
+        minutesLate: record.minutesLate || 0
       }
     })
   }, [historyData, currentTime])
@@ -275,7 +305,8 @@ export default function EmployeeAttendanceView() {
       const searchMatch = !searchTerm ||
         record.dateStr.toLowerCase().includes(searchLower) ||
         record.dayStr.toLowerCase().includes(searchLower) ||
-        record.status.toLowerCase().includes(searchLower)
+        record.status.toLowerCase().includes(searchLower) ||
+        record.minutesLateDisplay.toLowerCase().includes(searchLower)
 
       return statusMatch && searchMatch
     })
@@ -345,6 +376,40 @@ export default function EmployeeAttendanceView() {
     }
   }
 
+  const handleExportAttendance = (format) => {
+    if (filteredAttendance.length === 0) {
+      alert('No attendance records to export')
+      return
+    }
+
+    // Build CSV/export data from filtered attendance
+    const exportData = filteredAttendance.map(record => ({
+      Date: record.dateStr,
+      Day: record.dayStr,
+      'Clock In': record.clockInTime,
+      'Clock Out': record.clockOutTime,
+      'Total Hours': record.hoursStr,
+      Status: record.status,
+      'Minutes Late': record.minutesLate || 0
+    }))
+
+    if (format === 'csv') {
+      const headers = Object.keys(exportData[0])
+      const csvContent = [
+        headers.join(','),
+        ...exportData.map(row => headers.map(header => `"${row[header]}"`).join(','))
+      ].join('\n')
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `attendance_${formatDateForInput(new Date())}.csv`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -357,9 +422,14 @@ export default function EmployeeAttendanceView() {
   }
 
   const isSingleDateSelected = startDate === endDate
-  const emptyStateText = isSingleDateSelected
-    ? "No attendance exists for this date"
+  const emptyStateText = !hasAnyAssignment 
+    ? "No attendance record exists yet"
+    : isSingleDateSelected
+    ? "No attendance record exists for this date"
     : "No attendance records found for the selected range"
+  const emptyStateSubtext = !hasAnyAssignment
+    ? "You haven't been assigned to any shift yet. Please contact your administrator."
+    : "This date may be outside your assigned working days or selected date range."
 
   return (
     <div className="space-y-lg">
@@ -563,23 +633,55 @@ export default function EmployeeAttendanceView() {
                 <p className="text-body-md text-on-surface-variant">
                   Schedule: {todayData?.shiftStartTime ? todayData.shiftStartTime.substring(0, 5) : '09:00'} - {todayData?.shiftEndTime ? todayData.shiftEndTime.substring(0, 5) : '18:00'}
                 </p>
+                {todayData?.lateThresholdMinutes !== undefined && (
+                  <p className="text-label-md text-amber-700 bg-amber-50 px-sm py-xs rounded-md inline-block mt-xs border border-amber-200">
+                    Late Time Allowed: {todayData.lateThresholdMinutes} mins
+                  </p>
+                )}
 
                 {/* Active Clock In Information */}
                 {currentWindowState === 'CLOCKED_IN' && (
-                  <div className="mt-md flex items-center gap-lg">
-                    <div>
-                      <p className="text-label-sm text-on-surface-variant mb-xs">Clocked In At</p>
-                      <p className="text-headline-md font-headline-md text-on-surface">
-                        {attendanceRecord?.clockIn ? new Date(attendanceRecord.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                      </p>
+                  <div className="mt-md space-y-md">
+                    <div className="flex items-center gap-lg">
+                      <div>
+                        <p className="text-label-sm text-on-surface-variant mb-xs">Clocked In At</p>
+                        <p className="text-headline-md font-headline-md text-on-surface">
+                          {attendanceRecord?.clockIn ? new Date(attendanceRecord.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="w-px h-10 bg-outline-variant"></div>
+                      <div>
+                        <p className="text-label-sm text-on-surface-variant mb-xs">Time Elapsed</p>
+                        <p className="text-headline-md font-headline-md text-primary tabular-nums">
+                          {formatElapsed(elapsedSeconds)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-px h-10 bg-outline-variant"></div>
-                    <div>
-                      <p className="text-label-sm text-on-surface-variant mb-xs">Time Elapsed</p>
-                      <p className="text-headline-md font-headline-md text-primary tabular-nums">
-                        {formatElapsed(elapsedSeconds)}
-                      </p>
-                    </div>
+                    
+                    {/* Show if clocked in late */}
+                    {attendanceRecord?.clockIn && todayData?.shiftStartDateTime && todayData?.lateThresholdMinutes !== undefined && (() => {
+                      const clockInTime = new Date(attendanceRecord.clockIn);
+                      const shiftStart = new Date(todayData.shiftStartDateTime);
+                      const lateThreshold = new Date(shiftStart.getTime() + todayData.lateThresholdMinutes * 60000);
+                      const minutesLate = Math.floor((clockInTime - lateThreshold) / 60000);
+                      
+                      if (minutesLate > 0) {
+                        return (
+                          <div className="p-md bg-amber-50 border border-amber-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-amber-600">schedule</span>
+                              <div>
+                                <p className="text-label-md font-bold text-amber-900">Late Arrival</p>
+                                <p className="text-label-sm text-amber-700">
+                                  You clocked in {minutesLate} minute{minutesLate !== 1 ? 's' : ''} after the allowed late time ({todayData.lateThresholdMinutes} mins)
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
 
@@ -680,18 +782,29 @@ export default function EmployeeAttendanceView() {
               >
                 <option value="all">All</option>
                 <option value="present">Present</option>
+                <option value="late">Late</option>
                 <option value="absent">Absent</option>
               </select>
             </div>
 
             {/* Reset Button */}
-            <div className="flex items-end">
+            <div className="flex items-end gap-sm">
               <button
                 onClick={resetFilters}
-                className="w-full px-md py-sm border border-outline-variant rounded-lg text-label-md font-bold text-on-surface-variant hover:bg-surface-container-lowest transition-colors flex items-center justify-center gap-sm"
+                className="flex-1 px-md py-sm border border-outline-variant rounded-lg text-label-md font-bold text-on-surface-variant hover:bg-surface-container-lowest transition-colors flex items-center justify-center gap-sm"
               >
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
                 Reset
+              </button>
+              
+              {/* Export Button */}
+              <button
+                onClick={() => handleExportAttendance('csv')}
+                title="Export filtered attendance as CSV"
+                className="flex-1 px-md py-sm border border-outline-variant rounded-lg text-label-md font-bold text-on-surface-variant hover:bg-surface-container-lowest transition-colors flex items-center justify-center gap-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">download</span>
+                Export CSV
               </button>
             </div>
           </div>
@@ -730,9 +843,14 @@ export default function EmployeeAttendanceView() {
                       <p className="text-label-xs text-on-surface-variant">{record.dayStr}</p>
                     </td>
                     <td className="px-lg py-md">
-                      <span className={`inline-flex items-center px-xs py-0.5 rounded-full text-label-xs font-bold border ${record.statusColor}`}>
-                        {record.status}
-                      </span>
+                      <div className="flex flex-col gap-xs">
+                        <span className={`inline-flex items-center px-xs py-0.5 rounded-full text-label-xs font-bold border w-fit ${record.statusColor}`}>
+                          {record.status}
+                        </span>
+                        {record.minutesLateDisplay && (
+                          <span className="text-label-xs text-amber-600 font-semibold">({record.minutesLateDisplay})</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-lg py-md text-body-md text-on-surface font-medium">{record.clockInTime}</td>
                     <td className="px-lg py-md text-body-md text-on-surface font-medium">{record.clockOutTime}</td>
@@ -746,7 +864,7 @@ export default function EmployeeAttendanceView() {
                     <div className="flex flex-col items-center justify-center gap-sm">
                       <span className="material-symbols-outlined text-[48px] text-on-surface-variant/40">event_busy</span>
                       <p className="text-body-lg font-semibold text-on-surface-variant">{emptyStateText}</p>
-                      <p className="text-label-sm text-on-surface-variant/70">Adjust your date range or filters to search again.</p>
+                      <p className="text-label-sm text-on-surface-variant/70">{emptyStateSubtext}</p>
                     </div>
                   </td>
                 </tr>

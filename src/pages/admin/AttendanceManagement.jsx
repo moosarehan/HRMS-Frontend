@@ -7,7 +7,8 @@ import {
   deleteShift,
   assignEmployeeShift,
   getEmployeeWorkingDays,
-  updateEmployeeWorkingDays
+  updateEmployeeWorkingDays,
+  getAttendanceStats
 } from '../../api/hrmsApi'
 
 // Material Symbols icon component
@@ -90,7 +91,8 @@ const ShiftCard = ({ shift, onAdd, onEdit, onDelete }) => {
 const EditShiftModal = ({ isOpen, onClose, shift, onSave }) => {
   const [formData, setFormData] = useState({
     startTime: shift?.startTime?.substring(0, 5) || '',
-    endTime: shift?.endTime?.substring(0, 5) || ''
+    endTime: shift?.endTime?.substring(0, 5) || '',
+    lateThresholdMinutes: shift?.lateThresholdMinutes !== undefined && shift?.lateThresholdMinutes !== null ? shift.lateThresholdMinutes : 15
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -99,7 +101,8 @@ const EditShiftModal = ({ isOpen, onClose, shift, onSave }) => {
     if (shift) {
       setFormData({
         startTime: shift.startTime?.substring(0, 5) || '',
-        endTime: shift.endTime?.substring(0, 5) || ''
+        endTime: shift.endTime?.substring(0, 5) || '',
+        lateThresholdMinutes: shift.lateThresholdMinutes !== undefined && shift.lateThresholdMinutes !== null ? shift.lateThresholdMinutes : 15
       });
       setError('');
     }
@@ -162,6 +165,20 @@ const EditShiftModal = ({ isOpen, onClose, shift, onSave }) => {
             </div>
           </div>
 
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-900">Late Threshold (Minutes)</label>
+            <input 
+              type="number" 
+              min="0"
+              max="60"
+              placeholder="15"
+              value={formData.lateThresholdMinutes === undefined || formData.lateThresholdMinutes === null ? '' : formData.lateThresholdMinutes} 
+              onChange={(e) => setFormData({ ...formData, lateThresholdMinutes: e.target.value === '' ? 0 : parseInt(e.target.value) })} 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+            />
+            <p className="text-xs text-gray-600">Minutes after shift start time when employee is considered late (0 = immediately late, blank = 15 mins default)</p>
+          </div>
+
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-2">
             <Icon name="info" className="text-blue-600 flex-shrink-0" />
             <p className="text-sm text-blue-800">Overnight shifts (e.g. 8 PM – 2 AM) are fully supported. Times update immediately.</p>
@@ -182,7 +199,8 @@ const CreateShiftModal = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
     startTime: '',
-    endTime: ''
+    endTime: '',
+    lateThresholdMinutes: 15
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -210,7 +228,7 @@ const CreateShiftModal = ({ isOpen, onClose, onSave }) => {
     try {
       // Default limit to 100 since we no longer show it in UI
       await onSave({ ...formData, limit: 100 });
-      setFormData({ name: '', startTime: '', endTime: '' });
+      setFormData({ name: '', startTime: '', endTime: '', lateThresholdMinutes: 15 });
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to create shift');
@@ -269,6 +287,20 @@ const CreateShiftModal = ({ isOpen, onClose, onSave }) => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-900">Late Threshold (Minutes)</label>
+            <input 
+              type="number" 
+              min="0"
+              max="60"
+              placeholder="0"
+              value={formData.lateThresholdMinutes} 
+              onChange={(e) => setFormData({ ...formData, lateThresholdMinutes: parseInt(e.target.value) || 0 })} 
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+            />
+            <p className="text-xs text-gray-600">Minutes after shift start time when employee is considered late (0 = immediately late)</p>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-2">
@@ -559,6 +591,7 @@ export default function AttendanceManagement() {
   const [editingShift, setEditingShift] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [attendanceStats, setAttendanceStats] = useState({});
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isEditWorkingDaysOpen, setIsEditWorkingDaysOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -567,7 +600,17 @@ export default function AttendanceManagement() {
   useEffect(() => {
     loadShifts();
     loadEmployees();
+    loadAttendanceStats();
   }, []);
+
+  const loadAttendanceStats = async () => {
+    try {
+      const res = await getAttendanceStats();
+      setAttendanceStats(res.data.data || {});
+    } catch (err) {
+      console.error('Error loading attendance stats:', err);
+    }
+  };
 
   const normalizeWorkingDays = (wd) => ({
     monday: wd.monday ?? wd.Monday ?? true,
@@ -652,6 +695,13 @@ export default function AttendanceManagement() {
       
       setEmployees([...updatedEmps]);
       await Promise.all(updatedEmps.map(emp => loadEmployeeWorkingDays(emp.id)));
+      // Load attendance stats
+      try {
+        const res = await getAttendanceStats();
+        setAttendanceStats(res.data.data || {});
+      } catch (err) {
+        console.error('Error loading attendance stats:', err);
+      }
     } catch (err) {
       console.error('Error loading employees:', err);
     }
@@ -674,7 +724,7 @@ export default function AttendanceManagement() {
 
   const handleSaveShift = async (shiftId, data) => {
     try {
-      const payload = { startTime: data.startTime, endTime: data.endTime, limit: data.limit };
+      const payload = { startTime: data.startTime, endTime: data.endTime, limit: data.limit, lateThresholdMinutes: data.lateThresholdMinutes || 0 };
       await updateShift(shiftId, payload);
       await loadShifts();
     } catch (err) {
@@ -689,7 +739,8 @@ export default function AttendanceManagement() {
         name: data.name, 
         startTime: data.startTime, 
         endTime: data.endTime, 
-        limit: data.limit 
+        limit: data.limit,
+        lateThresholdMinutes: data.lateThresholdMinutes || 0
       };
       await createShift(payload);
       await loadShifts();
@@ -889,6 +940,8 @@ export default function AttendanceManagement() {
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Role</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Current Shift</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Working Days</th>
+                  <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">Late</th>
+                  <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">Absent</th>
                   <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">Actions</th>
                 </tr>
               </thead>
@@ -949,6 +1002,16 @@ export default function AttendanceManagement() {
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 text-amber-700 font-bold text-sm">
+                        {attendanceStats[emp.id]?.lateCount ?? 0}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-700 font-bold text-sm">
+                        {attendanceStats[emp.id]?.absentCount ?? 0}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
