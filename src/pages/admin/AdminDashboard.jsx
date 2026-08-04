@@ -10,8 +10,10 @@ import AdminLeaveManagementPanel from './AdminLeaveManagementPanel'
 import AdminLeaveRequestsPanel from './AdminLeaveRequestsPanel'
 import AttendanceManagement from './AttendanceManagement'
 import AttendanceSheetPanel from './AttendanceSheetPanel'
+import TeamChat from '../../components/TeamChat'
 
 const NAV = [
+  { key: 'chat',         label: 'Chat',          icon: 'forum'     },
   { key: 'branches',    label: 'Branches',        icon: 'account_tree'},
   { key: 'departments', label: 'Departments',     icon: 'apartment' },
   { key: 'employees',   label: 'User Management', icon: 'group'     },
@@ -42,6 +44,10 @@ export default function AdminDashboard() {
   const [activeKey, setActiveKey] = useState('departments')
 
   const pageInfo = {
+    chat: {
+      title: 'Chat',
+      subtitle: 'Direct messaging with employees company-wide.',
+    },
     branches: {
       title: 'Branch Management',
       subtitle: 'Oversee company branches, locations, and contact information.',
@@ -84,6 +90,7 @@ export default function AdminDashboard() {
       activeKey={activeKey}
       onNavClick={setActiveKey}
     >
+      {activeKey === 'chat'    && <TeamChat />}
       {activeKey === 'branches'    && <BranchesPanel    />}
       {activeKey === 'departments' && <DepartmentsPanel />}
       {activeKey === 'employees'   && <EmployeesPanel   />}

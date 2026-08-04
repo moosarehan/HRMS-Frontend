@@ -15,6 +15,17 @@ const formatDateForInput = (date) => {
   return `${d.getFullYear()}-${month}-${day}`;
 };
 
+// API history dates are date-only values. Parse them locally so the displayed day
+// and date search do not shift because of UTC timezone conversion.
+const parseHistoryDate = (value) => {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
+  return new Date(value)
+}
+
 // Get Monday of the current week
 const getStartOfWeek = (date) => {
   const d = new Date(date);
@@ -233,7 +244,7 @@ export default function EmployeeAttendanceView() {
   // Formatted history table data
   const formattedHistoryData = useMemo(() => {
     return historyData.map(record => {
-      const d = new Date(record.date)
+      const d = parseHistoryDate(record.date)
       const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       const dayStr = d.toLocaleDateString('en-US', { weekday: 'long' })
       const clockInTime = record.clockIn ? new Date(record.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'
@@ -256,10 +267,14 @@ export default function EmployeeAttendanceView() {
         }
       }
 
-      // Determine status: check isLate property first (from backend), then fallback to clockIn presence
-      const status = record.isLate ? 'Late' : (record.clockIn ? 'Present' : 'Absent')
+      // Determine status: check isOnLeave first, then isLate, then clockIn presence
+      const status = record.isOnLeave ? 'On Leave' : (record.shiftName === 'Working Day Off' ? 'Working Day Off' : (record.isLate ? 'Late' : (record.clockIn ? 'Present' : 'Absent')))
       let statusColor = 'bg-rose-100 text-rose-800' // Absent default
-      if (record.isLate) {
+      if (record.isOnLeave) {
+        statusColor = 'bg-blue-100 text-blue-800' // On Leave
+      } else if (record.shiftName === 'Working Day Off') {
+        statusColor = 'bg-slate-100 text-slate-800' // Working Day Off
+      } else if (record.isLate) {
         statusColor = 'bg-amber-100 text-amber-800' // Late
       } else if (record.clockIn) {
         statusColor = 'bg-emerald-100 text-emerald-800' // Present
@@ -275,6 +290,7 @@ export default function EmployeeAttendanceView() {
 
       return {
         id: record.id,
+        date: record.date,
         dateStr,
         dayStr,
         status,
@@ -291,12 +307,17 @@ export default function EmployeeAttendanceView() {
   const filteredAttendance = useMemo(() => {
     return formattedHistoryData.filter(record => {
       const statusMatch = statusFilter === 'all' || record.status.toLowerCase() === statusFilter.toLowerCase()
-      const searchLower = searchTerm.toLowerCase()
-      const searchMatch = !searchTerm ||
-        record.dateStr.toLowerCase().includes(searchLower) ||
-        record.dayStr.toLowerCase().includes(searchLower) ||
-        record.status.toLowerCase().includes(searchLower) ||
-        record.minutesLateDisplay.toLowerCase().includes(searchLower)
+      const searchLower = searchTerm.trim().toLowerCase()
+      const searchMatch = !searchLower || [
+        record.date,
+        record.dateStr,
+        record.dayStr,
+        record.status,
+        record.clockInTime,
+        record.clockOutTime,
+        record.hoursStr,
+        record.minutesLateDisplay
+      ].some(value => String(value).toLowerCase().includes(searchLower))
 
       return statusMatch && searchMatch
     })
@@ -366,40 +387,6 @@ export default function EmployeeAttendanceView() {
     }
   }
 
-  const handleExportAttendance = (format) => {
-    if (filteredAttendance.length === 0) {
-      alert('No attendance records to export')
-      return
-    }
-
-    // Build CSV/export data from filtered attendance
-    const exportData = filteredAttendance.map(record => ({
-      Date: record.dateStr,
-      Day: record.dayStr,
-      'Clock In': record.clockInTime,
-      'Clock Out': record.clockOutTime,
-      'Total Hours': record.hoursStr,
-      Status: record.status,
-      'Minutes Late': record.minutesLate || 0
-    }))
-
-    if (format === 'csv') {
-      const headers = Object.keys(exportData[0])
-      const csvContent = [
-        headers.join(','),
-        ...exportData.map(row => headers.map(header => `"${row[header]}"`).join(','))
-      ].join('\n')
-      
-      const blob = new Blob([csvContent], { type: 'text/csv' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `attendance_${formatDateForInput(new Date())}.csv`
-      a.click()
-      window.URL.revokeObjectURL(url)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -411,12 +398,6 @@ export default function EmployeeAttendanceView() {
     )
   }
 
-  const isSingleDateSelected = startDate === endDate
-  const emptyStateText = !hasAnyAssignment 
-    ? "No attendance record exists yet"
-    : isSingleDateSelected
-    ? "No attendance record exists for this date"
-    : "No attendance records found for the selected range"
   const emptyStateSubtext = !hasAnyAssignment
     ? "You haven't been assigned to any shift yet. Please contact your administrator."
     : "This date may be outside your assigned working days or selected date range."
@@ -786,16 +767,6 @@ export default function EmployeeAttendanceView() {
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
                 Reset
               </button>
-              
-              {/* Export Button */}
-              <button
-                onClick={() => handleExportAttendance('csv')}
-                title="Export filtered attendance as CSV"
-                className="flex-1 px-md py-sm border border-outline-variant rounded-lg text-label-md font-bold text-on-surface-variant hover:bg-surface-container-lowest transition-colors flex items-center justify-center gap-sm"
-              >
-                <span className="material-symbols-outlined text-[18px]">download</span>
-                Export CSV
-              </button>
             </div>
           </div>
 
@@ -853,7 +824,7 @@ export default function EmployeeAttendanceView() {
                   <td colSpan="5" className="px-lg py-12 text-center">
                     <div className="flex flex-col items-center justify-center gap-sm">
                       <span className="material-symbols-outlined text-[48px] text-on-surface-variant/40">event_busy</span>
-                      <p className="text-body-lg font-semibold text-on-surface-variant">{emptyStateText}</p>
+                      <p className="text-body-lg font-semibold text-on-surface-variant">No history records</p>
                       <p className="text-label-sm text-on-surface-variant/70">{emptyStateSubtext}</p>
                     </div>
                   </td>

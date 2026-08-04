@@ -4,6 +4,7 @@ import { getAllEmployees, getAllDepartments, getMyProfile, updateMyProfile, getA
 import { useAuth } from '../../context/AuthContext.jsx'
 import LeavePanel from '../../components/LeavePanel'
 import EmployeeAttendanceView from '../../components/EmployeeAttendanceView'
+import TeamChat from '../../components/TeamChat'
 
 const NAV = [
   { key: 'branch',     label: 'My Branch',     icon: 'account_tree' },
@@ -11,6 +12,7 @@ const NAV = [
   { key: 'team',       label: 'Team Members',  icon: 'groups'    },
   { key: 'attendance', label: 'Attendance',    icon: 'fact_check' },
   { key: 'leave',      label: 'Leave',         icon: 'calendar_today' },
+  { key: 'messages',   label: 'Messages',      icon: 'chat' },
   { key: 'profile',    label: 'My Profile',    icon: 'person'    },
   { key: 'settings',   label: 'Logout',        icon: 'logout'    },
 ]
@@ -38,6 +40,7 @@ export default function ManagerDashboard() {
       case 'team': return 'View members of your department. Read-only — contact HR or Admin for changes.'
       case 'attendance': return 'View your daily attendance records and history.'
       case 'leave': return 'Apply for leave and view your leave requests.'
+      case 'messages': return 'Connect and communicate with team members'
       case 'profile': return 'Manage your personal information'
       default: return ''
     }
@@ -56,6 +59,7 @@ export default function ManagerDashboard() {
       {activeKey === 'team' && <TeamPanel />}
       {activeKey === 'attendance' && <EmployeeAttendanceView />}
       {activeKey === 'leave' && <LeavePanel />}
+      {activeKey === 'messages' && <TeamChat />}
       {activeKey === 'profile' && <ProfilePanel />}
     </DashboardLayout>
   )

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import DashboardLayout from '../../components/DashboardLayout.jsx'
 import LeavePanel from '../../components/LeavePanel'
 import EmployeeAttendanceView from '../../components/EmployeeAttendanceView'
+import TeamChat from '../../components/TeamChat'
 import { 
   getAllEmployees, 
   getAllDepartments, 
@@ -20,6 +21,7 @@ const NAV = [
   { key: 'employees',  label: 'Employees & Managers', icon: 'group'     },
   { key: 'attendance', label: 'Attendance',          icon: 'fact_check' },
   { key: 'leave',      label: 'Leave',               icon: 'calendar_today' },
+  { key: 'messages',   label: 'Messages',            icon: 'chat' },
   { key: 'profile',    label: 'My Profile',          icon: 'person'    },
   { key: 'settings',   label: 'Logout',              icon: 'logout'    },
 ]
@@ -53,6 +55,7 @@ export default function HrDashboard() {
       case 'employees': return 'Create, manage, and remove employee and manager accounts.'
       case 'attendance': return 'View your daily attendance records and history.'
       case 'leave': return 'Apply for leave and view your leave requests.'
+      case 'messages': return 'Connect and communicate with team members'
       case 'profile': return 'Manage your personal information'
       default: return ''
     }
@@ -71,6 +74,7 @@ export default function HrDashboard() {
       {activeKey === 'employees' && <EmployeesPanel sharedEmployees={sharedEmployees} onEmployeesLoad={setSharedEmployees} />}
       {activeKey === 'attendance' && <EmployeeAttendanceView />}
       {activeKey === 'leave' && <LeavePanel />}
+      {activeKey === 'messages' && <TeamChat />}
       {activeKey === 'profile' && <ProfilePanel />}
     </DashboardLayout>
   )
