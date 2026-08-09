@@ -8,6 +8,7 @@ import {
   getAllLeaves,
 } from '../../api/hrmsApi'
 import { useLeave } from '../../context/LeaveContext'
+import { formatLeaveDays } from '../../utils/leaveUtils'
 
 export default function AdminLeaveManagementPanel() {
   const { currentPeriod, periodLoading, refreshCurrentPeriod, leaveTypes } = useLeave()
@@ -27,6 +28,12 @@ export default function AdminLeaveManagementPanel() {
   const [createPeriodModalOpen, setCreatePeriodModalOpen] = useState(false)
   const [formError, setFormError] = useState('')
   const [deletingPeriod, setDeletingPeriod] = useState(false)
+  const [currentTime, setCurrentTime] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000)
+    return () => clearInterval(timer)
+  }, [])
 
   // Pagination
   const itemsPerPage = 10
@@ -135,7 +142,7 @@ export default function AdminLeaveManagementPanel() {
         const empQuotasArray = Object.values(empQuotasMap)
         
         // Find currently active approved leave for this employee
-        const today = new Date()
+        const today = new Date(currentTime)
         today.setHours(0, 0, 0, 0) // Reset time to start of day for accurate comparison
         
         const approvedLeaves = allLeaveRequests.filter(req => {
@@ -145,6 +152,12 @@ export default function AdminLeaveManagementPanel() {
           
           const startDate = new Date(req.startDate)
           const endDate = new Date(req.endDate)
+
+          // Fractional leave is active only between the exact application and end times.
+          if (Number(req.noOfDays) < 1) {
+            return currentTime >= startDate && currentTime < endDate
+          }
+
           startDate.setHours(0, 0, 0, 0)
           endDate.setHours(23, 59, 59, 999)
           
@@ -166,7 +179,7 @@ export default function AdminLeaveManagementPanel() {
           hasQuotas: empQuotasArray.length > 0,
         }
       })
-  }, [employees, employeeQuotasMap, allLeaveRequests])
+  }, [employees, employeeQuotasMap, allLeaveRequests, currentTime])
 
   // Filter by search query only (removed department filter)
   const filteredRows = useMemo(() => {
@@ -223,13 +236,13 @@ export default function AdminLeaveManagementPanel() {
   }
 
   const validateQuotaForm = () => {
-    const totalAllocated = Object.values(quotaFormData).reduce((sum, val) => sum + (parseInt(val) || 0), 0)
+    const totalAllocated = Object.values(quotaFormData).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
     if (totalAllocated > effectivePeriod.totalAllowedDays) {
       setFormError(`Total quota (${totalAllocated} days) cannot exceed maximum allowed days (${effectivePeriod.totalAllowedDays} days)`)
       return false
     }
     
-    const hasAnyAllocation = Object.values(quotaFormData).some(val => parseInt(val) > 0)
+    const hasAnyAllocation = Object.values(quotaFormData).some(val => parseFloat(val) > 0)
     if (!hasAnyAllocation) {
       setFormError('Please allocate days to at least one leave type')
       return false
@@ -250,7 +263,7 @@ export default function AdminLeaveManagementPanel() {
       const empQuotasMap = employeeQuotasMap.get(selectedEmployee.id) || {}
 
       for (const leaveType of leaveTypes) {
-        const allocatedDays = parseInt(quotaFormData[leaveType.id]) || 0
+        const allocatedDays = parseFloat(quotaFormData[leaveType.id]) || 0
         
         if (allocatedDays > 0) {
           const existingQuota = empQuotasMap[leaveType.id]
@@ -538,7 +551,7 @@ export default function AdminLeaveManagementPanel() {
                           <td className="px-md py-md">
                             <div className="flex items-center gap-2">
                               <span className={`font-semibold ${totalUsed > 0 ? 'text-error' : 'text-on-surface-variant'}`}>
-                                {totalUsed} days
+                                {formatLeaveDays(totalUsed)} days
                               </span>
                               <div className="w-12 h-2 bg-surface-container-low rounded-full overflow-hidden">
                                 <div
@@ -653,9 +666,9 @@ export default function AdminLeaveManagementPanel() {
               {/* Input Cards Grid - 2 columns */}
               <div className="space-y-2">
                 {leaveTypes.map(leaveType => {
-                  const currentValue = parseInt(quotaFormData[leaveType.id]) || 0
+                  const currentValue = parseFloat(quotaFormData[leaveType.id]) || 0
                   const totalOthers = Object.entries(quotaFormData).reduce((sum, [typeId, val]) => {
-                    return typeId !== leaveType.id.toString() ? sum + (parseInt(val) || 0) : sum
+                    return typeId !== leaveType.id.toString() ? sum + (parseFloat(val) || 0) : sum
                   }, 0)
                   const maxAllowed = (effectivePeriod?.totalAllowedDays || 0) - totalOthers
                   
@@ -670,12 +683,13 @@ export default function AdminLeaveManagementPanel() {
                           type="number"
                           value={quotaFormData[leaveType.id] || ''}
                           onChange={(e) => {
-                            const newVal = parseInt(e.target.value) || 0
+                            const newVal = parseFloat(e.target.value) || 0
                             if (newVal <= maxAllowed) {
                               handleQuotaFormChange(leaveType.id, e.target.value)
                             }
                           }}
                           min="0"
+                          step="0.25"
                           max={maxAllowed}
                           placeholder="0"
                           className="flex-1 px-2 py-1.5 font-body-sm text-body-sm bg-surface-container-lowest border border-outline-variant rounded focus:ring-2 focus:ring-secondary/20 focus:border-transparent"
@@ -689,17 +703,17 @@ export default function AdminLeaveManagementPanel() {
 
               {/* Summary Section - Compact */}
               <div className={`p-2 rounded-lg transition-all duration-300 border text-center ${
-                Object.values(quotaFormData).reduce((sum, val) => sum + (parseInt(val) || 0), 0) > (effectivePeriod?.totalAllowedDays || 0)
+                Object.values(quotaFormData).reduce((sum, val) => sum + (parseFloat(val) || 0), 0) > (effectivePeriod?.totalAllowedDays || 0)
                   ? 'bg-error-container/20 border-error'
                   : 'bg-surface-container border-outline-variant'
               }`}>
                 <div className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-0.5">Total Allocated</div>
                 <div className={`font-headline-sm text-headline-sm ${
-                  Object.values(quotaFormData).reduce((sum, val) => sum + (parseInt(val) || 0), 0) > (effectivePeriod?.totalAllowedDays || 0)
+                  Object.values(quotaFormData).reduce((sum, val) => sum + (parseFloat(val) || 0), 0) > (effectivePeriod?.totalAllowedDays || 0)
                     ? 'text-error'
                     : 'text-on-surface'
                 }`}>
-                  {Object.values(quotaFormData).reduce((sum, val) => sum + (parseInt(val) || 0), 0)} / {effectivePeriod?.totalAllowedDays || 0}
+                  {formatLeaveDays(Object.values(quotaFormData).reduce((sum, val) => sum + (parseFloat(val) || 0), 0))} / {formatLeaveDays(effectivePeriod?.totalAllowedDays || 0)}
                 </div>
               </div>
 
@@ -714,7 +728,7 @@ export default function AdminLeaveManagementPanel() {
                 </button>
                 <button
                   onClick={handleSubmitQuotaForm}
-                  disabled={submitting || Object.values(quotaFormData).reduce((sum, val) => sum + (parseInt(val) || 0), 0) > (effectivePeriod?.totalAllowedDays || 0)}
+                  disabled={submitting || Object.values(quotaFormData).reduce((sum, val) => sum + (parseFloat(val) || 0), 0) > (effectivePeriod?.totalAllowedDays || 0)}
                   className={`px-4 py-2 rounded-lg font-label-sm flex items-center gap-1 transition-all whitespace-nowrap ${
                     modalMode === 'add'
                       ? 'bg-tertiary text-on-tertiary hover:opacity-90 disabled:opacity-50'
@@ -768,7 +782,7 @@ function CreateLeavePeriodModal({ isOpen, onClose, onSuccess }) {
         name: `FY ${year}`,
         startDate,
         endDate,
-        totalAllowedDays: parseInt(totalAllowedDays, 10),
+        totalAllowedDays: parseFloat(totalAllowedDays),
       })
       onClose()
       if (onSuccess) await onSuccess()
