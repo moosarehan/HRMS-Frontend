@@ -1,3 +1,5 @@
+import { formatLeaveDays } from '../utils/leaveUtils'
+
 /**
  * LeaveStatCard — displays remaining leave days for a specific leave type
  * 
@@ -51,7 +53,7 @@ export default function LeaveStatCard({
         <>
           <div className="mb-md">
             <p className={`text-display-sm font-display-sm ${statusColor}`}>
-              {remainingDays}/{totalAllowed}
+              {formatLeaveDays(remainingDays)}/{formatLeaveDays(totalAllowed)}
             </p>
             <p className="text-body-sm text-on-surface-variant">Remaining days</p>
           </div>
