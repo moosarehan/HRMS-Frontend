@@ -7,8 +7,9 @@ import {
 import { useLeave } from '../context/LeaveContext'
 import { useAuth } from '../context/AuthContext'
 import { useLeaveSetupStatus } from '../hooks/useLeaveSetupStatus'
-import { calculateDays } from '../utils/leaveUtils'
+import { calculateDays, formatLeaveDays } from '../utils/leaveUtils'
 import LeaveStatCard from './LeaveStatCard'
+import LeaveDurationSelector from './LeaveDurationSelector'
 
 export default function LeavePanel() {
   const { user } = useAuth()
@@ -22,10 +23,12 @@ export default function LeavePanel() {
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [toast, setToast] = useState(null)
+  const [currentTime, setCurrentTime] = useState(() => new Date())
   
   // Apply Leave Form State
   const [leaveForm, setLeaveForm] = useState({
     leaveTypeId: '',
+    duration: null, // null = date range, 'FullDay' = fractional, etc.
     startDate: '',
     endDate: '',
     noOfDays: 0,
@@ -73,11 +76,20 @@ export default function LeavePanel() {
     loadEmployeeLeaveData()
   }, [user?.employeeId, setupStatus, loading])
 
-  // Update days when date changes
   useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Update days when date changes (only for date-range mode)
+  useEffect(() => {
+    if (leaveForm.duration !== null && leaveForm.duration !== undefined) {
+      // Fractional mode - don't recalculate from dates
+      return
+    }
     const days = calculateDays(leaveForm.startDate, leaveForm.endDate)
     setLeaveForm(prev => ({ ...prev, noOfDays: days }))
-  }, [leaveForm.startDate, leaveForm.endDate])
+  }, [leaveForm.startDate, leaveForm.endDate, leaveForm.duration])
 
   const handleApplyLeave = async (e) => {
     e.preventDefault()
@@ -88,12 +100,14 @@ export default function LeavePanel() {
         endDate: leaveForm.endDate,
         leaveTypeId: parseInt(leaveForm.leaveTypeId),
         noOfDays: leaveForm.noOfDays,
+        duration: leaveForm.duration, // null for date-range, 'FullDay'/'HalfDay'/etc. for fractional
         description: leaveForm.description || null,
       })
       
       setApplyModalOpen(false)
       setLeaveForm({
         leaveTypeId: '',
+        duration: null,
         startDate: '',
         endDate: '',
         noOfDays: 0,
@@ -115,6 +129,12 @@ export default function LeavePanel() {
   const showToast = (message, icon, type) => {
     setToast({ message, icon, type })
     setTimeout(() => setToast(null), 3000)
+  }
+
+  const getLocalToday = () => {
+    const now = new Date()
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60 * 1000)
+    return localDate.toISOString().slice(0, 10)
   }
 
   const formatDate = (dateStr) => {
@@ -148,7 +168,7 @@ export default function LeavePanel() {
 
   // Check for active approved leaves (currently ongoing)
   const getActiveApprovedLeaves = () => {
-    const today = new Date()
+    const today = new Date(currentTime)
     today.setHours(0, 0, 0, 0) // Set to start of day for comparison
     
     return leaveHistory.filter(request => {
@@ -156,6 +176,11 @@ export default function LeavePanel() {
       
       const startDate = new Date(request.startDate)
       const endDate = new Date(request.endDate) 
+
+      if (Number(request.noOfDays) < 1) {
+        return currentTime >= startDate && currentTime < endDate
+      }
+
       startDate.setHours(0, 0, 0, 0)
       endDate.setHours(23, 59, 59, 999) // Set to end of day
       
@@ -436,7 +461,7 @@ export default function LeavePanel() {
                         {formatDate(request.startDate)} - {formatDate(request.endDate)}
                       </p>
                       <p className="text-body-sm text-on-surface-variant">
-                        {request.noOfDays} Working Days
+                        {formatLeaveDays(request.noOfDays)} Working Days
                       </p>
                     </td>
                     <td className="px-xl py-lg">
@@ -474,7 +499,14 @@ export default function LeavePanel() {
                   <label className="font-label-md text-label-md text-on-surface-variant">Leave Type</label>
                   <select
                     value={leaveForm.leaveTypeId}
-                    onChange={(e) => setLeaveForm(prev => ({ ...prev, leaveTypeId: e.target.value }))}
+                    onChange={(e) => setLeaveForm(prev => ({
+                      ...prev,
+                      leaveTypeId: e.target.value,
+                      duration: null,  // Reset duration when leave type changes
+                      startDate: '',
+                      endDate: '',
+                      noOfDays: 0
+                    }))}
                     className="w-full bg-surface-container-low border border-outline-variant rounded-xl font-body-md p-3 focus:ring-2 focus:ring-secondary/20 transition-all"
                     required
                   >
@@ -487,13 +519,41 @@ export default function LeavePanel() {
                 <div className="space-y-xs">
                   <label className="font-label-md text-label-md text-on-surface-variant">Days Calculated</label>
                   <input
-                    type="number"
-                    value={leaveForm.noOfDays}
+                    type="text"
+                    value={leaveForm.duration === 'FullDay' ? '1.0' : formatLeaveDays(leaveForm.noOfDays)}
                     readOnly
+                    step="0.25"
                     className="w-full bg-surface-container-low border border-outline-variant rounded-xl font-body-md p-3 opacity-60"
                   />
                 </div>
               </div>
+
+              {/* Duration Selector (Sick/Casual only) */}
+              {leaveForm.leaveTypeId && (
+                <LeaveDurationSelector
+                  leaveTypeName={leaveTypes.find(lt => lt.id === parseInt(leaveForm.leaveTypeId))?.name}
+                  selectedDuration={leaveForm.duration}
+                  onDurationChange={(duration) => {
+                    setLeaveForm(prev => {
+                      const newForm = { ...prev, duration }
+
+                      // If fractional (duration is set), set dates to today
+                      if (duration !== null) {
+                        const today = getLocalToday()
+                        newForm.startDate = today
+                        newForm.endDate = today
+                      } else {
+                        // If date-range mode, clear dates so user can select
+                        newForm.startDate = ''
+                        newForm.endDate = ''
+                        newForm.noOfDays = 0
+                      }
+                      return newForm
+                    })
+                  }}
+                  onDaysChange={(days) => setLeaveForm(prev => ({ ...prev, noOfDays: days }))}
+                />
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
                 <div className="space-y-xs">
@@ -502,8 +562,9 @@ export default function LeavePanel() {
                     type="date"
                     value={leaveForm.startDate}
                     onChange={(e) => setLeaveForm(prev => ({ ...prev, startDate: e.target.value }))}
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-xl font-body-md p-3 focus:ring-2 focus:ring-secondary/20"
-                    required
+                    disabled={leaveForm.duration !== null && leaveForm.duration !== undefined}
+                    className="w-full bg-surface-container-low border border-outline-variant rounded-xl font-body-md p-3 focus:ring-2 focus:ring-secondary/20 disabled:opacity-60"
+                    required={leaveForm.duration === null}
                   />
                 </div>
                 <div className="space-y-xs">
@@ -512,8 +573,9 @@ export default function LeavePanel() {
                     type="date"
                     value={leaveForm.endDate}
                     onChange={(e) => setLeaveForm(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-xl font-body-md p-3 focus:ring-2 focus:ring-secondary/20"
-                    required
+                    disabled={leaveForm.duration !== null && leaveForm.duration !== undefined}
+                    className="w-full bg-surface-container-low border border-outline-variant rounded-xl font-body-md p-3 focus:ring-2 focus:ring-secondary/20 disabled:opacity-60"
+                    required={leaveForm.duration === null}
                   />
                 </div>
               </div>
@@ -611,7 +673,7 @@ export default function LeavePanel() {
                             {formatDate(request.startDate)} - {formatDate(request.endDate)}
                           </p>
                           <p className="text-body-sm text-on-surface-variant">
-                            {request.noOfDays} Days
+                            {formatLeaveDays(request.noOfDays)} Days
                           </p>
                         </td>
                         <td className="px-xl py-lg">
@@ -657,7 +719,7 @@ export default function LeavePanel() {
                     <div className="flex justify-between items-center mb-2">
                       <h4 className="font-label-md text-label-md">{quota.leaveTypeName}</h4>
                       <span className="text-body-sm text-on-surface-variant">
-                        {quota.remainingDays} / {quota.allocatedDays} days
+                        {formatLeaveDays(quota.remainingDays)} / {formatLeaveDays(quota.allocatedDays)} days
                       </span>
                     </div>
                     <div className="w-full bg-surface-container-low h-2 rounded-full">
@@ -667,8 +729,8 @@ export default function LeavePanel() {
                       />
                     </div>
                     <div className="flex justify-between text-body-sm text-on-surface-variant mt-1">
-                      <span>Used: {quota.usedDays} days</span>
-                      <span>Remaining: {quota.remainingDays} days</span>
+                      <span>Used: {formatLeaveDays(quota.usedDays)} days</span>
+                      <span>Remaining: {formatLeaveDays(quota.remainingDays)} days</span>
                     </div>
                   </div>
                 ))}
