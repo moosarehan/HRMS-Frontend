@@ -89,6 +89,7 @@ export default function AdminDashboard() {
       navItems={NAV}
       activeKey={activeKey}
       onNavClick={setActiveKey}
+      noPadding={activeKey === 'chat'}
     >
       {activeKey === 'chat'    && <TeamChat />}
       {activeKey === 'branches'    && <BranchesPanel    />}
