@@ -18,6 +18,7 @@ export default function DashboardLayout({
   navItems,
   activeKey,
   onNavClick,
+  noPadding = false,
   children,
 }) {
   const { user, logout } = useAuth()
@@ -38,7 +39,7 @@ export default function DashboardLayout({
     : 'U'
 
   return (
-    <div className="bg-surface-container-low text-on-surface min-h-screen flex flex-col overflow-x-hidden">
+    <div className="bg-surface-container-low text-on-surface h-screen flex flex-col overflow-hidden">
 
       {/* ── Top Navigation Bar ── */}
       <header className="bg-surface border-b border-outline-variant flex justify-between items-center w-full px-md h-16 sticky top-0 z-50">
@@ -126,16 +127,22 @@ export default function DashboardLayout({
         </aside>
 
         {/* ── Main Content Canvas ── */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-md md:p-lg space-y-lg">
-          {/* Page Header */}
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-md">
-            <div>
-              <h1 className="text-headline-lg font-headline-lg text-on-surface">{title}</h1>
-              {subtitle && (
-                <p className="text-body-md font-body-md text-on-surface-variant mt-1">{subtitle}</p>
-              )}
+        <main className={`flex-1 ${
+            noPadding
+              ? 'overflow-hidden'
+              : 'overflow-y-auto custom-scrollbar p-md md:p-lg space-y-lg'
+          }`}>
+          {/* Page Header — hidden in full-bleed (noPadding) mode */}
+          {!noPadding && (
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-md">
+              <div>
+                <h1 className="text-headline-lg font-headline-lg text-on-surface">{title}</h1>
+                {subtitle && (
+                  <p className="text-body-md font-body-md text-on-surface-variant mt-1">{subtitle}</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Slot for role-specific content */}
           {children}
