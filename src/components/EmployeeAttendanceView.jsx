@@ -85,6 +85,22 @@ export default function EmployeeAttendanceView() {
     loadData()
   }, [startDate, endDate])
 
+  // Re-check active fractional leave windows so the normal attendance screen
+  // returns as soon as the leave end time is reached.
+  useEffect(() => {
+    const refreshLeaveStatus = async () => {
+      try {
+        const response = await getMyTodayAttendance()
+        setTodayData(response.data?.data || null)
+      } catch (err) {
+        console.error('Failed to refresh leave status:', err)
+      }
+    }
+
+    const timer = setInterval(refreshLeaveStatus, 30000)
+    return () => clearInterval(timer)
+  }, [])
+
   // Assignment status comes from the server. An employee may have a shift before
   // their first attendance row, so history length is not a valid assignment check.
   const hasAnyAssignment = todayData?.hasEverBeenAssigned ?? false
@@ -121,6 +137,15 @@ export default function EmployeeAttendanceView() {
   const attendanceRecord = todayData?.todayAttendance
   const isOffDay = hasShift && !todayData?.isWorkingDayToday
   const isOnLeave = todayData?.isOnLeaveToday
+  const fractionalLeaveLabels = {
+    0.25: 'Quarter',
+    0.5: 'Half',
+    0.75: 'Three-Quarter',
+  }
+  const fractionalLeaveLabel = fractionalLeaveLabels[Number(todayData?.leaveDays)]
+  const leaveDisplayName = fractionalLeaveLabel
+    ? `${fractionalLeaveLabel} ${todayData?.leaveType || 'Leave'}`
+    : todayData?.leaveType
 
   // Weekly stats: calculate total hours worked this week from real data
   const weeklyStats = useMemo(() => {
@@ -267,15 +292,17 @@ export default function EmployeeAttendanceView() {
         }
       }
 
-      // Determine status: check isOnLeave first, then isLate, then clockIn presence
-      const status = record.isOnLeave ? 'On Leave' : (record.shiftName === 'Working Day Off' ? 'Working Day Off' : (record.isLate ? 'Late' : (record.clockIn ? 'Present' : 'Absent')))
+      // A fractional leave does not hide a late arrival: both conditions belong to the same day.
+      const status = record.isOnLeave && record.isLate
+        ? 'Late (Partial Leave)'
+        : (record.isOnLeave ? 'On Leave' : (record.shiftName === 'Working Day Off' ? 'Working Day Off' : (record.isLate ? 'Late' : (record.clockIn ? 'Present' : 'Absent'))))
       let statusColor = 'bg-rose-100 text-rose-800' // Absent default
-      if (record.isOnLeave) {
+      if (record.isLate) {
+        statusColor = 'bg-amber-100 text-amber-800' // Late, including a partial-leave arrival
+      } else if (record.isOnLeave) {
         statusColor = 'bg-blue-100 text-blue-800' // On Leave
       } else if (record.shiftName === 'Working Day Off') {
         statusColor = 'bg-slate-100 text-slate-800' // Working Day Off
-      } else if (record.isLate) {
-        statusColor = 'bg-amber-100 text-amber-800' // Late
       } else if (record.clockIn) {
         statusColor = 'bg-emerald-100 text-emerald-800' // Present
       } else {
@@ -435,15 +462,19 @@ export default function EmployeeAttendanceView() {
               <div className="w-20 h-20 bg-tertiary-container rounded-full flex items-center justify-center mb-md shadow-sm">
                 <span className="material-symbols-outlined text-tertiary text-[40px]">sick</span>
               </div>
-              <h3 className="text-headline-lg font-headline-lg text-on-surface mb-xs">Enjoy your day off!</h3>
+              <h3 className="text-headline-lg font-headline-lg text-on-surface mb-xs">
+                {fractionalLeaveLabel ? `Enjoy your ${fractionalLeaveLabel} Leave!` : 'Enjoy your day off!'}
+              </h3>
               <p className="text-on-surface-variant font-body-lg max-w-lg mb-lg">
-                You are on approved leave today. No clock-in is required.
+                {fractionalLeaveLabel
+                  ? `You are on approved ${fractionalLeaveLabel.toLowerCase()} leave right now. Clock-in will be available after it ends.`
+                  : 'You are on approved leave today. No clock-in is required.'}
               </p>
               
               {todayData?.leaveType && (
                 <div className="bg-tertiary-container px-lg py-sm rounded-full border border-tertiary-container-highest flex items-center gap-sm mb-md">
                   <span className="material-symbols-outlined text-on-tertiary-container">event_available</span>
-                  <span className="font-label-md text-on-tertiary-container">{todayData.leaveType}</span>
+                  <span className="font-label-md text-on-tertiary-container">{leaveDisplayName}</span>
                 </div>
               )}
               

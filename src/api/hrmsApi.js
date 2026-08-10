@@ -41,6 +41,7 @@ export const updateLeaveQuota = (quotaId, data) => api.put(`/leave/quotas/${quot
 // --- Leave Requests (LeaveController) ---
 // --- Leave Requests (LeaveController) ---
 export const getLeaveSetupStatus = (employeeId) => api.get(`/leave/setup-status/employee/${employeeId}`)
+export const getFractionalLeaveEligibility = () => api.get(`/leave/fractional-leave-eligibility`)
 export const applyForLeave = (data) => api.post('/leave/requests/apply', data)
 export const getEmployeePendingLeaves = () => api.get('/leave/requests/pending')
 export const getAllPendingLeaves = () => api.get('/leave/requests/pending/all')
