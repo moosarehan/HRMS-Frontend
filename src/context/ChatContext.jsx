@@ -30,8 +30,10 @@ export function ChatProvider({ children }) {
         const signalR = await import('@microsoft/signalr')
         
         const connection = new signalR.HubConnectionBuilder()
-          .withUrl('http://localhost:5184/hub/chat')
-          .withAutomaticReconnect()
+          .withUrl('http://localhost:5000/hub/chat', {
+            accessTokenFactory: () => localStorage.getItem('hrms_token') || ''
+          })
+          .withAutomaticReconnect([0, 2000, 5000, 10000])
           .build()
 
         // Register listeners

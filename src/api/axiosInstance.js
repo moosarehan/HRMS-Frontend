@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Point this at your HRMS_BACKEND base URL (matches Jwt:Issuer in appsettings.json)
 // Use Vite env var VITE_API_BASE_URL to configure the backend host/port.
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5184/api'
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
 const api = axios.create({
   baseURL,
 })

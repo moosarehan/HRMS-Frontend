@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useChat } from '../context/ChatContext'
 import axiosInstance from '../api/axiosInstance'
@@ -6,15 +6,43 @@ import axiosInstance from '../api/axiosInstance'
 /* ─────────────────────────────────────────────────────────────────── */
 /*  Helpers                                                             */
 /* ─────────────────────────────────────────────────────────────────── */
+function isCurrentUser(id, user) {
+  if (!id || !user) return false
+  const sId = String(id)
+  const myId = String(user.id || '')
+  const myEmpId = user.employeeId ? String(user.employeeId) : ''
+  return sId === myId || (myEmpId && sId === myEmpId)
+}
+
 function formatTime(dateStr) {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffMins < 1) return 'Now'
+  if (diffMins < 60) return `${diffMins}m`
+  if (diffHours < 24) return `${diffHours}h`
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays}d`
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
 function getInitials(name) {
   if (!name) return '?'
   return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 }
+
+const isGroupChannelType = (type) => type === 'Group' || type === 1 || type === '1' || type === 'group'
+const isDirectChannelType = (type) => type === 'Direct' || type === 0 || type === '0' || type === 'direct'
 
 /* ─────────────────────────────────────────────────────────────────── */
 /*  Avatar – initials fallback                                          */
@@ -37,7 +65,7 @@ function Avatar({ name, size = 10, className = '' }) {
 /* ─────────────────────────────────────────────────────────────────── */
 /*  Online indicator dot                                                */
 /* ─────────────────────────────────────────────────────────────────── */
-function OnlineDot({ online }) {
+function OnlineDot({ online = true }) {
   return (
     <span
       className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
@@ -88,39 +116,62 @@ function DeptChannelItem({ channel, isSelected, onClick }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────── */
-/*  Channel list item — Direct Message                                  */
+/*  Channel list item — Direct Message (WhatsApp style card)            */
 /* ─────────────────────────────────────────────────────────────────── */
-function DirectChannelItem({ channel, isSelected, onClick, currentUserId }) {
+function DirectChannelItem({ channel, isSelected, onClick, currentUser }) {
   const lastMsg = channel.messages?.[channel.messages.length - 1]
-  const otherMember = channel.members?.find((m) => m.userId !== currentUserId)
-  const displayName = otherMember?.userName || channel.name || 'Unknown'
+  
+  // Find other member who is NOT the current logged in user
+  const otherMember = channel.members?.find(
+    (m) => !isCurrentUser(m.employeeId ?? m.userId, currentUser)
+  )
+
+  let displayName = otherMember?.employeeName || otherMember?.fullName || otherMember?.userName || ''
+  
+  if (!displayName || displayName === 'Unknown' || displayName.includes('&')) {
+    const rawName = channel.name || ''
+    if (rawName.includes('&')) {
+      const parts = rawName.split('&').map((s) => s.trim())
+      const myName = currentUser?.name || currentUser?.fullName || ''
+      displayName = parts.find((p) => p.toLowerCase() !== myName.toLowerCase()) || parts[0]
+    } else {
+      displayName = rawName
+    }
+  }
+
+  const timeText = lastMsg?.sentAt ? formatRelativeTime(lastMsg.sentAt) : ''
+  const isOwnLastMsg = lastMsg ? isCurrentUser(lastMsg.senderId, currentUser) : false
 
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left flex items-center gap-3 p-2 rounded-lg transition-colors relative ${
+      className={`w-full text-left flex items-center gap-3 p-2.5 rounded-xl transition-all relative ${
         isSelected
           ? 'bg-[rgba(0,82,204,0.12)] border border-[rgba(0,82,204,0.3)] after:absolute after:left-0 after:top-1/2 after:-translate-y-1/2 after:h-2/3 after:w-1 after:bg-primary after:rounded-r-full'
           : 'hover:bg-surface-container-low'
       }`}
     >
-      <div className="relative">
+      <div className="relative shrink-0">
         <Avatar name={displayName} size={10} />
-        <OnlineDot online={false} />
+        <OnlineDot online={true} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline mb-0.5">
-          <h4 className={`text-sm truncate ${isSelected ? 'font-bold text-on-surface' : 'font-medium text-on-surface'}`}>
+          <h4 className={`text-sm truncate ${isSelected ? 'font-bold text-on-surface' : 'font-semibold text-on-surface'}`}>
             {displayName}
           </h4>
-          {lastMsg && (
-            <span className="text-[11px] text-on-surface-variant">
-              {formatTime(lastMsg.sentAt)}
+          {timeText && (
+            <span className={`text-xs ${isSelected ? 'text-primary font-medium' : 'text-on-surface-variant'}`}>
+              {timeText}
             </span>
           )}
         </div>
         <p className="text-xs text-on-surface-variant truncate">
-          {lastMsg ? lastMsg.content : 'No messages yet'}
+          {lastMsg ? (
+            <span>{isOwnLastMsg ? 'You: ' : ''}{lastMsg.content}</span>
+          ) : (
+            <span className="italic opacity-75">No messages yet</span>
+          )}
         </p>
       </div>
     </button>
@@ -128,12 +179,12 @@ function DirectChannelItem({ channel, isSelected, onClick, currentUserId }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────── */
-/*  Message Bubble                                                       */
+/*  Message Bubble (WhatsApp style: Right for Me, Left for Others)       */
 /* ─────────────────────────────────────────────────────────────────── */
-function MessageBubble({ message, currentUserId, isGroup, prevMessage }) {
-  const isOwn = message.senderId === currentUserId
+function MessageBubble({ message, currentUser, isGroup, prevMessage }) {
+  const isOwn = isCurrentUser(message.senderId, currentUser)
   const showSenderInfo =
-    !isOwn && isGroup && (!prevMessage || prevMessage.senderId !== message.senderId)
+    !isOwn && isGroup && (!prevMessage || String(prevMessage.senderId) !== String(message.senderId))
 
   return (
     <div className={`flex gap-2.5 ${isOwn ? 'justify-end' : 'justify-start'} max-w-[85%] ${isOwn ? 'self-end' : 'self-start'}`}>
@@ -179,12 +230,10 @@ function MessageBubble({ message, currentUserId, isGroup, prevMessage }) {
           <p className="text-sm leading-5 break-words">{message.content}</p>
         </div>
 
-        {/* Timestamp for outgoing or when no sender header */}
-        {(isOwn || (!isGroup && !isOwn)) && (
-          <span className="text-[10px] text-on-surface-variant px-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {formatTime(message.sentAt)}
-          </span>
-        )}
+        {/* Timestamp */}
+        <span className="text-[10px] text-on-surface-variant px-1 opacity-70">
+          {formatTime(message.sentAt)}
+        </span>
       </div>
     </div>
   )
@@ -211,7 +260,7 @@ function TypingIndicator({ count }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────── */
-/*  Empty state                                                          */
+/*  Empty states                                                         */
 /* ─────────────────────────────────────────────────────────────────── */
 function EmptyConversation({ channelName }) {
   return (
@@ -271,13 +320,9 @@ export default function TeamChat() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('department') // 'department' | 'direct'
   const [directChannels, setDirectChannels] = useState([])
-  const [employeeSearch, setEmployeeSearch] = useState([])
-  const [empSearchQuery, setEmpSearchQuery] = useState('')
-  const [showNewDM, setShowNewDM] = useState(false)
 
   const messagesEndRef = useRef(null)
   const typingTimeoutRef = useRef(null)
-  const empSearchRef = useRef(null)
 
   /* ── Load channels on mount ── */
   useEffect(() => {
@@ -285,38 +330,68 @@ export default function TeamChat() {
     loadChannels()
   }, [user])
 
+  /* ── Sync direct channels from ChatContext when channels state updates ── */
+  useEffect(() => {
+    if (channels && channels.length > 0) {
+      const directs = channels.filter((ch) => isDirectChannelType(ch.type))
+      if (directs.length > 0) {
+        setDirectChannels(directs)
+      }
+    }
+  }, [channels])
+
   /* ── Auto-scroll to newest message ── */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  /* ── Close employee search dropdown on outside click ── */
-  useEffect(() => {
-    const handler = (e) => {
-      if (empSearchRef.current && !empSearchRef.current.contains(e.target)) {
-        setEmployeeSearch([])
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
   /* ── Load channels ── */
   const loadChannels = async () => {
     try {
       setLoading(true)
-      const res = await axiosInstance.get('/api/chat/my-channels')
-      const all = res.data?.data || []
-      const groups = all.filter((ch) => ch.type === 'Group')
-      const directs = all.filter((ch) => ch.type === 'Direct')
+
+      // 1. Load group/department channels (non-admin only)
+      let groups = []
+      if (!isAdmin) {
+        try {
+          const res = await axiosInstance.get('/chat/my-channels')
+          const all = res.data?.data || []
+          groups = all.filter((ch) => isGroupChannelType(ch.type))
+
+          // Fallback: fetch department channel directly if none in my-channels
+          if (groups.length === 0) {
+            try {
+              const deptRes = await axiosInstance.get('/chat/department/my-channel')
+              if (deptRes.data?.data) {
+                groups = [deptRes.data.data]
+              }
+            } catch (e) {
+              console.error('Fallback department channel load failed:', e)
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load group channels:', e)
+        }
+      }
+
+      // 2. Load ALL direct message channels (auto-creates for every employee in the system)
+      let directs = []
+      try {
+        const directRes = await axiosInstance.get('/chat/direct/my-channels')
+        directs = directRes.data?.data || []
+      } catch (e) {
+        console.error('Failed to load direct channels:', e)
+      }
 
       updateChannels(groups)
       setDirectChannels(directs)
 
-      // Auto select department channel if none selected yet
-      if (groups.length > 0 && !selectedChannel) {
+      // Auto select first channel on load
+      if (isAdmin && directs.length > 0 && !selectedChannel) {
+        handleSelectChannel(directs[0])
+      } else if (!isAdmin && groups.length > 0 && !selectedChannel) {
         handleSelectChannel(groups[0])
-      } else if (directs.length > 0 && !selectedChannel) {
+      } else if (!selectedChannel && directs.length > 0) {
         handleSelectChannel(directs[0])
       }
     } catch (err) {
@@ -329,9 +404,9 @@ export default function TeamChat() {
   /* ── Select / open a channel ── */
   const handleSelectChannel = async (channel) => {
     selectChannel(channel)
-    setActiveTab(channel.type === 'Direct' ? 'direct' : 'department')
+    setActiveTab(isDirectChannelType(channel.type) ? 'direct' : 'department')
     try {
-      const res = await axiosInstance.get(`/api/chat/${channel.id}/messages`)
+      const res = await axiosInstance.get(`/chat/${channel.id}/messages`)
       updateMessages(res.data?.data || [])
       await joinChannel(channel.id)
     } catch (err) {
@@ -339,46 +414,39 @@ export default function TeamChat() {
     }
   }
 
-  /* ── Send message ── */
+  /* ── Send message (optimistically moves chat to #1 position) ── */
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChannel) return
-    const msg = newMessage
+    const msgContent = newMessage.trim()
     setNewMessage('')
+    const now = new Date().toISOString()
+
     try {
-      await sendMessage(selectedChannel.id, msg)
+      await sendMessage(selectedChannel.id, msgContent)
+
+      // Optimistically update direct channel's lastMessageAt so it moves to top #1 instantly
+      setDirectChannels((prevDirects) => {
+        return prevDirects.map((ch) => {
+          if (ch.id === selectedChannel.id) {
+            const tempMsg = {
+              id: Date.now(),
+              chatChannelId: selectedChannel.id,
+              senderId: user?.id || user?.employeeId,
+              senderName: user?.fullName || user?.name || 'Me',
+              content: msgContent,
+              sentAt: now,
+            }
+            return {
+              ...ch,
+              lastMessageAt: now,
+              messages: [...(ch.messages || []), tempMsg],
+            }
+          }
+          return ch
+        })
+      })
     } catch {
-      setNewMessage(msg)
-    }
-  }
-
-  /* ── Start a direct message ── */
-  const handleStartDirectMessage = async (employeeId) => {
-    try {
-      const res = await axiosInstance.post(`/api/chat/direct/with/${employeeId}`)
-      const channel = res.data?.data
-      if (channel) {
-        // Add to list if not present
-        setDirectChannels((prev) =>
-          prev.find((c) => c.id === channel.id) ? prev : [channel, ...prev]
-        )
-        handleSelectChannel(channel)
-        setShowNewDM(false)
-        setEmpSearchQuery('')
-        setEmployeeSearch([])
-      }
-    } catch (err) {
-      console.error('Failed to start direct message:', err)
-    }
-  }
-
-  /* ── Employee search ── */
-  const handleSearchEmployees = async (term = '') => {
-    setEmpSearchQuery(term)
-    try {
-      const res = await axiosInstance.get(`/api/chat/employees/search?searchTerm=${encodeURIComponent(term)}`)
-      setEmployeeSearch(res.data?.data || [])
-    } catch (err) {
-      console.error('Failed to search employees:', err)
+      setNewMessage(msgContent)
     }
   }
 
@@ -398,22 +466,60 @@ export default function TeamChat() {
     }
   }
 
-  /* ── Filtered lists ── */
+  /* ── Filter out self-chats & sort by LastMessageAt descending (Top #1 chat order!) ── */
+  const sortedDirectChannels = useMemo(() => {
+    // Exclude any self-chat where all members are the current user
+    const validDirects = directChannels.filter((ch) => {
+      const members = ch.members || []
+      if (members.length === 0) return true
+      return members.some((m) => !isCurrentUser(m.employeeId ?? m.userId, user))
+    })
+
+    return validDirects.sort((a, b) => {
+      const lastMsgA = a.messages?.[a.messages.length - 1]
+      const lastMsgB = b.messages?.[b.messages.length - 1]
+      const timeA = a.lastMessageAt || lastMsgA?.sentAt
+      const timeB = b.lastMessageAt || lastMsgB?.sentAt
+
+      if (timeA && timeB) return new Date(timeB) - new Date(timeA)
+      if (timeA) return -1
+      if (timeB) return 1
+      return (a.name || '').localeCompare(b.name || '')
+    })
+  }, [directChannels, user])
+
+  /* ── Filtered lists by search term ── */
   const filteredChannels = channels.filter((ch) =>
     ch.name?.toLowerCase().includes(searchTerm.toLowerCase())
   )
-  const filteredDirectChannels = directChannels.filter((ch) =>
-    ch.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+
+  const filteredDirectChannels = sortedDirectChannels.filter((ch) => {
+    const otherMember = ch.members?.find((m) => !isCurrentUser(m.employeeId ?? m.userId, user))
+    const name = otherMember?.employeeName || otherMember?.fullName || ch.name || ''
+    const term = searchTerm.toLowerCase()
+    const lastContent = ch.messages?.[ch.messages.length - 1]?.content || ''
+    return name.toLowerCase().includes(term) || lastContent.toLowerCase().includes(term)
+  })
 
   /* ── Selected channel helpers ── */
-  const isGroupChannel = selectedChannel?.type === 'Group'
+  const isGroupChannel = isGroupChannelType(selectedChannel?.type)
   const otherMember = !isGroupChannel && selectedChannel
-    ? selectedChannel.members?.find((m) => m.userId !== user?.id)
+    ? selectedChannel.members?.find((m) => !isCurrentUser(m.employeeId ?? m.userId, user))
     : null
-  const chatTitle = isGroupChannel
+
+  let chatTitle = isGroupChannel
     ? selectedChannel?.name
-    : otherMember?.userName || selectedChannel?.name || ''
+    : otherMember?.employeeName || otherMember?.fullName || selectedChannel?.name || ''
+
+  if (!isGroupChannel && (!chatTitle || chatTitle.includes('&'))) {
+    const rawName = selectedChannel?.name || ''
+    if (rawName.includes('&')) {
+      const parts = rawName.split('&').map((s) => s.trim())
+      const myName = user?.name || user?.fullName || ''
+      chatTitle = parts.find((p) => p.toLowerCase() !== myName.toLowerCase()) || parts[0]
+    }
+  }
+
   const memberCount = selectedChannel?.members?.length || 0
   const typingCount = typingUsers[selectedChannel?.id]?.length || 0
 
@@ -439,7 +545,7 @@ export default function TeamChat() {
             </span>
             <input
               className="w-full pl-10 pr-4 py-2 bg-surface rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-blue-100 transition-shadow text-sm text-on-surface placeholder:text-on-surface-variant outline-none"
-              placeholder={isAdmin ? 'Find people...' : 'Search people or messages...'}
+              placeholder={isAdmin ? 'Search people...' : 'Search people or messages...'}
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -461,10 +567,7 @@ export default function TeamChat() {
               Department
             </button>
             <button
-              onClick={() => {
-                setActiveTab('direct')
-                handleSearchEmployees('')
-              }}
+              onClick={() => setActiveTab('direct')}
               className={`flex-1 py-3 px-4 text-sm font-medium text-center border-b-2 transition-colors ${
                 activeTab === 'direct'
                   ? 'border-primary text-primary'
@@ -477,19 +580,21 @@ export default function TeamChat() {
         )}
 
         {/* ── Scrollable list ── */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
 
-          {/* ─ Admin: only DMs ─ */}
+          {/* ─ Admin: Direct Messages Only ─ */}
           {isAdmin && (
             <div className="space-y-1">
-              {filteredDirectChannels.length > 0 ? (
+              {loading ? (
+                <div className="py-6 text-center text-sm text-on-surface-variant">Loading employees…</div>
+              ) : filteredDirectChannels.length > 0 ? (
                 filteredDirectChannels.map((ch) => (
                   <DirectChannelItem
                     key={ch.id}
                     channel={ch}
                     isSelected={selectedChannel?.id === ch.id}
                     onClick={() => handleSelectChannel(ch)}
-                    currentUserId={user?.id}
+                    currentUser={user}
                   />
                 ))
               ) : (
@@ -497,7 +602,7 @@ export default function TeamChat() {
                   <span className="material-symbols-outlined text-[40px] text-on-surface-variant block mb-2">
                     chat_bubble_outline
                   </span>
-                  <p className="text-sm text-on-surface-variant">No direct messages yet</p>
+                  <p className="text-sm text-on-surface-variant">No direct messages found</p>
                 </div>
               )}
             </div>
@@ -530,108 +635,42 @@ export default function TeamChat() {
 
           {/* ─ Non-admin: Direct tab ─ */}
           {!isAdmin && activeTab === 'direct' && (
-            <div>
-              <div className="flex justify-between items-center mb-2 px-1">
-                <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                  Direct Messages
-                </h3>
-                <button
-                  onClick={() => {
-                    const next = !showNewDM
-                    setShowNewDM(next)
-                    if (next) handleSearchEmployees('')
-                  }}
-                  className="text-on-surface-variant hover:text-primary transition-colors"
-                  title="New Direct Message"
-                >
-                  <span className="material-symbols-outlined text-xl">add</span>
-                </button>
+            <div className="space-y-3">
+              <div className="relative px-1">
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
+                  search
+                </span>
+                <input
+                  className="w-full pl-10 pr-4 py-1.5 bg-surface rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-blue-100 transition-shadow text-xs text-on-surface placeholder:text-on-surface-variant outline-none"
+                  placeholder="Search by name..."
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
 
-              {/* New DM search */}
-              {showNewDM && (
-                <div ref={empSearchRef} className="relative mb-3">
-                  <input
-                    type="text"
-                    placeholder="Search employee..."
-                    value={empSearchQuery}
-                    onFocus={() => handleSearchEmployees(empSearchQuery)}
-                    onChange={(e) => handleSearchEmployees(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-surface rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-blue-100 outline-none"
-                  />
-                  {employeeSearch.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-20 max-h-40 overflow-y-auto">
-                      {employeeSearch.map((emp) => (
-                        <button
-                          key={emp.id}
-                          onClick={() => handleStartDirectMessage(emp.id)}
-                          className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-surface-container-low text-sm text-on-surface transition-colors"
-                        >
-                          <Avatar name={emp.fullName} size={7} />
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-medium text-sm truncate">{emp.fullName}</span>
-                            <span className="text-xs text-on-surface-variant truncate">{emp.role} {emp.email ? `• ${emp.email}` : ''}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div className="space-y-1">
-                {filteredDirectChannels.length > 0 ? (
+                {loading ? (
+                  <div className="py-6 text-center text-sm text-on-surface-variant">Loading employees…</div>
+                ) : filteredDirectChannels.length > 0 ? (
                   filteredDirectChannels.map((ch) => (
                     <DirectChannelItem
                       key={ch.id}
                       channel={ch}
                       isSelected={selectedChannel?.id === ch.id}
                       onClick={() => handleSelectChannel(ch)}
-                      currentUserId={user?.id}
+                      currentUser={user}
                     />
                   ))
                 ) : (
                   <div className="py-6 text-center text-sm text-on-surface-variant">
-                    No direct messages yet
+                    No direct messages found
                   </div>
                 )}
               </div>
             </div>
           )}
         </div>
-
-        {/* ── Admin: New message button ── */}
-        {isAdmin && (
-          <div className="p-4 border-t border-outline-variant">
-            <div ref={empSearchRef} className="relative">
-              <input
-                type="text"
-                placeholder="New message — search employee..."
-                value={empSearchQuery}
-                onFocus={() => handleSearchEmployees(empSearchQuery)}
-                onChange={(e) => handleSearchEmployees(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-surface rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-blue-100 outline-none"
-              />
-              {employeeSearch.length > 0 && (
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-20 max-h-40 overflow-y-auto">
-                  {employeeSearch.map((emp) => (
-                    <button
-                      key={emp.id}
-                      onClick={() => handleStartDirectMessage(emp.id)}
-                      className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-surface-container-low text-sm text-on-surface transition-colors"
-                    >
-                      <Avatar name={emp.fullName} size={7} />
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-medium text-sm truncate">{emp.fullName}</span>
-                        <span className="text-xs text-on-surface-variant truncate">{emp.role} {emp.email ? `• ${emp.email}` : ''}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </aside>
 
       {/* ══════════════════════════════════════════════════════ */}
@@ -701,9 +740,9 @@ export default function TeamChat() {
               </div>
             </div>
 
-            {/* ── Messages area ── */}
+            {/* ── Messages area (WhatsApp style layout) ── */}
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-surface-bright relative">
-              {/* Subtle dot pattern for admin */}
+              {/* Subtle background pattern for admin */}
               {isAdmin && (
                 <div
                   className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -727,9 +766,9 @@ export default function TeamChat() {
                 <>
                   {messages.map((msg, idx) => (
                     <MessageBubble
-                      key={msg.id}
+                      key={msg.id || idx}
                       message={msg}
-                      currentUserId={user?.id}
+                      currentUser={user}
                       isGroup={isGroupChannel}
                       prevMessage={idx > 0 ? messages[idx - 1] : null}
                     />

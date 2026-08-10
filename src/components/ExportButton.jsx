@@ -7,8 +7,8 @@ function ExportButton({ branch, department, search, date, activeView }) {
   const { token } = useAuth();
 
   // Use environment variable for API base URL (configured in .env.local or vite.config.js)
-  // Falls back to localhost:5184 if not specified
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5184'
+  // Falls back to localhost:5000 if not specified
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
   const handleExport = async (format) => {
     setOpen(false);
