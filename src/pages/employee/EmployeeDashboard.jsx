@@ -49,6 +49,7 @@ export default function EmployeeDashboard() {
       navItems={NAV}
       activeKey={activeKey}
       onNavClick={setActiveKey}
+      noPadding={activeKey === 'messages'}
     >
       {activeKey === 'department' && <DepartmentPanel />}
       {activeKey === 'branch' && <BranchPanel />}
