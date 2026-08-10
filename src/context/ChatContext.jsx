@@ -35,9 +35,14 @@ export function ChatProvider({ children }) {
           .build()
 
         // Register listeners
-        connection.on('ReceiveMessage', (message) => {
-          setMessages(prev => [...prev, message])
-        })
+        const handleNewMessage = (message) => {
+          setMessages(prev => {
+            if (prev.some(m => m.id === message.id)) return prev
+            return [...prev, message]
+          })
+        }
+        connection.on('ReceiveMessage', handleNewMessage)
+        connection.on('MessageReceived', handleNewMessage)
 
         connection.on('UserTyping', (userId, channelId) => {
           setTypingUsers(prev => ({
