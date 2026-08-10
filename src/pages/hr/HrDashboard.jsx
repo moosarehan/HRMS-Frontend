@@ -68,6 +68,7 @@ export default function HrDashboard() {
       navItems={NAV}
       activeKey={activeKey}
       onNavClick={setActiveKey}
+      noPadding={activeKey === 'messages'}
     >
       {activeKey === 'branch' && <BranchPanel />}
       {activeKey === 'department' && <DepartmentPanel sharedEmployees={sharedEmployees} onEmployeesLoad={setSharedEmployees} />}
