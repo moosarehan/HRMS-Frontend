@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import LeavePanel from '../../components/LeavePanel'
 import EmployeeAttendanceView from '../../components/EmployeeAttendanceView'
 import TeamChat from '../../components/TeamChat'
+import CompanyAnnouncementsView from '../../components/CompanyAnnouncementsView'
 
 const NAV = [
   { key: 'branch',     label: 'My Branch',     icon: 'account_tree' },
@@ -12,6 +13,7 @@ const NAV = [
   { key: 'team',       label: 'Team Members',  icon: 'groups'    },
   { key: 'attendance', label: 'Attendance',    icon: 'fact_check' },
   { key: 'leave',      label: 'Leave',         icon: 'calendar_today' },
+  { key: 'announcements', label: 'Announcements', icon: 'campaign' },
   { key: 'messages',   label: 'Messages',      icon: 'chat' },
   { key: 'profile',    label: 'My Profile',    icon: 'person'    },
   { key: 'settings',   label: 'Logout',        icon: 'logout'    },
@@ -28,6 +30,7 @@ export default function ManagerDashboard() {
       case 'team': return 'Team Members'
       case 'attendance': return 'My Attendance History'
       case 'leave': return 'Leave'
+      case 'announcements': return 'Company Announcements'
       case 'profile': return 'My Profile'
       default: return 'Manager Dashboard'
     }
@@ -40,6 +43,7 @@ export default function ManagerDashboard() {
       case 'team': return 'View members of your department. Read-only — contact HR or Admin for changes.'
       case 'attendance': return 'View your daily attendance records and history.'
       case 'leave': return 'Apply for leave and view your leave requests.'
+      case 'announcements': return 'Stay updated with company-wide news and broadcasts.'
       case 'messages': return 'Connect and communicate with team members'
       case 'profile': return 'Manage your personal information'
       default: return ''
@@ -60,6 +64,7 @@ export default function ManagerDashboard() {
       {activeKey === 'team' && <TeamPanel />}
       {activeKey === 'attendance' && <EmployeeAttendanceView />}
       {activeKey === 'leave' && <LeavePanel />}
+      {activeKey === 'announcements' && <CompanyAnnouncementsView variant="full" />}
       {activeKey === 'messages' && <TeamChat />}
       {activeKey === 'profile' && <ProfilePanel />}
     </DashboardLayout>
