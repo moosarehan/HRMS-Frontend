@@ -82,3 +82,9 @@ export const getAdminTimesheet = (date) => api.get('/attendance/admin/timesheet'
 export const approveEmergencyClockOut = (attendanceId) => api.put(`/attendance/admin/emergency-clock-out/${attendanceId}/approve`)
 export const rejectEmergencyClockOut = (attendanceId) => api.put(`/attendance/admin/emergency-clock-out/${attendanceId}/reject`)
 export const backfillShiftAssignments = () => api.post('/attendance/admin/backfill-shift-assignments')
+
+// --- Announcements (AnnouncementController) ---
+export const getAllAnnouncements = () => api.get('/announcement')
+export const createAnnouncement = (data) => api.post('/announcement', data)
+export const updateAnnouncement = (id, data) => api.put(`/announcement/${id}`, data)
+export const deleteAnnouncement = (id) => api.delete(`/announcement/${id}`)
