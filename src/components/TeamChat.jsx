@@ -320,6 +320,8 @@ export default function TeamChat() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('department') // 'department' | 'direct'
   const [directChannels, setDirectChannels] = useState([])
+  const [deptChannel, setDeptChannel] = useState(null)
+  const [noDepartment, setNoDepartment] = useState(false)
 
   const messagesEndRef = useRef(null)
   const typingTimeoutRef = useRef(null)
@@ -350,27 +352,24 @@ export default function TeamChat() {
     try {
       setLoading(true)
 
-      // 1. Load group/department channels (non-admin only)
+      // 1. Load department channel (non-admin only) — always fetch fresh from employee's current department
       let groups = []
       if (!isAdmin) {
         try {
-          const res = await axiosInstance.get('/chat/my-channels')
-          const all = res.data?.data || []
-          groups = all.filter((ch) => isGroupChannelType(ch.type))
-
-          // Fallback: fetch department channel directly if none in my-channels
-          if (groups.length === 0) {
-            try {
-              const deptRes = await axiosInstance.get('/chat/department/my-channel')
-              if (deptRes.data?.data) {
-                groups = [deptRes.data.data]
-              }
-            } catch (e) {
-              console.error('Fallback department channel load failed:', e)
-            }
+          const deptRes = await axiosInstance.get('/chat/department/my-channel')
+          if (deptRes.data?.data) {
+            setDeptChannel(deptRes.data.data)
+            setNoDepartment(false)
+            groups = [deptRes.data.data]
+          } else {
+            // API returned success but null data — employee has no department
+            setDeptChannel(null)
+            setNoDepartment(true)
           }
         } catch (e) {
-          console.error('Failed to load group channels:', e)
+          console.error('Department channel load failed:', e)
+          setDeptChannel(null)
+          setNoDepartment(true)
         }
       }
 
@@ -616,18 +615,17 @@ export default function TeamChat() {
               </h3>
               {loading ? (
                 <div className="py-6 text-center text-sm text-on-surface-variant">Loading…</div>
-              ) : filteredChannels.length > 0 ? (
-                filteredChannels.map((ch) => (
-                  <DeptChannelItem
-                    key={ch.id}
-                    channel={ch}
-                    isSelected={selectedChannel?.id === ch.id}
-                    onClick={() => handleSelectChannel(ch)}
-                  />
-                ))
+              ) : deptChannel ? (
+                <DeptChannelItem
+                  channel={deptChannel}
+                  isSelected={selectedChannel?.id === deptChannel.id}
+                  onClick={() => handleSelectChannel(deptChannel)}
+                />
               ) : (
-                <div className="py-6 text-center text-sm text-on-surface-variant">
-                  No department chats found
+                <div className="py-10 text-center">
+                  <span className="material-symbols-outlined text-[48px] text-on-surface-variant/40 block mb-3">group_off</span>
+                  <p className="text-sm font-medium text-on-surface-variant">Not part of any group chat</p>
+                  <p className="text-xs text-on-surface-variant/60 mt-1">You are not assigned to a department</p>
                 </div>
               )}
             </div>
@@ -635,39 +633,24 @@ export default function TeamChat() {
 
           {/* ─ Non-admin: Direct tab ─ */}
           {!isAdmin && activeTab === 'direct' && (
-            <div className="space-y-3">
-              <div className="relative px-1">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
-                  search
-                </span>
-                <input
-                  className="w-full pl-10 pr-4 py-1.5 bg-surface rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-blue-100 transition-shadow text-xs text-on-surface placeholder:text-on-surface-variant outline-none"
-                  placeholder="Search by name..."
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                {loading ? (
-                  <div className="py-6 text-center text-sm text-on-surface-variant">Loading employees…</div>
-                ) : filteredDirectChannels.length > 0 ? (
-                  filteredDirectChannels.map((ch) => (
-                    <DirectChannelItem
-                      key={ch.id}
-                      channel={ch}
-                      isSelected={selectedChannel?.id === ch.id}
-                      onClick={() => handleSelectChannel(ch)}
-                      currentUser={user}
-                    />
-                  ))
-                ) : (
-                  <div className="py-6 text-center text-sm text-on-surface-variant">
-                    No direct messages found
-                  </div>
-                )}
-              </div>
+            <div className="space-y-1">
+              {loading ? (
+                <div className="py-6 text-center text-sm text-on-surface-variant">Loading employees…</div>
+              ) : filteredDirectChannels.length > 0 ? (
+                filteredDirectChannels.map((ch) => (
+                  <DirectChannelItem
+                    key={ch.id}
+                    channel={ch}
+                    isSelected={selectedChannel?.id === ch.id}
+                    onClick={() => handleSelectChannel(ch)}
+                    currentUser={user}
+                  />
+                ))
+              ) : (
+                <div className="py-6 text-center text-sm text-on-surface-variant">
+                  No direct messages found
+                </div>
+              )}
             </div>
           )}
         </div>
