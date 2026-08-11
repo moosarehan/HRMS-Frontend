@@ -8,6 +8,7 @@ import {
 } from '../../api/hrmsApi'
 import AdminLeaveManagementPanel from './AdminLeaveManagementPanel'
 import AdminLeaveRequestsPanel from './AdminLeaveRequestsPanel'
+import AdminAnnouncementsPanel from './AdminAnnouncementsPanel'
 import AttendanceManagement from './AttendanceManagement'
 import AttendanceSheetPanel from './AttendanceSheetPanel'
 import TeamChat from '../../components/TeamChat'
@@ -21,6 +22,7 @@ const NAV = [
   { key: 'attendance-sheet', label: 'Attendance Sheet', icon: 'fact_check' },
   { key: 'leave-management', label: 'Leave Management', icon: 'calendar_today' },
   { key: 'leave-requests', label: 'Leave Requests', icon: 'assignment' },
+  { key: 'announcements', label: 'Company Announcements', icon: 'campaign' },
   { key: 'profile',     label: 'My Profile',      icon: 'person'    },
   { key: 'settings',    label: 'Logout',          icon: 'logout'    },
 ]
@@ -76,6 +78,10 @@ export default function AdminDashboard() {
       title: 'Leave Requests',
       subtitle: 'Review and approve employee leave requests across all departments.',
     },
+    announcements: {
+      title: 'Company Announcements',
+      subtitle: 'Post and manage company-wide broadcasts visible to all employees.',
+    },
     profile: {
       title: 'My Profile',
       subtitle: 'Manage your personal information',
@@ -99,6 +105,7 @@ export default function AdminDashboard() {
       {activeKey === 'attendance-sheet' && <AttendanceSheetPanel />}
       {activeKey === 'leave-management' && <AdminLeaveManagementPanel />}
       {activeKey === 'leave-requests' && <AdminLeaveRequestsPanel />}
+      {activeKey === 'announcements' && <AdminAnnouncementsPanel />}
       {activeKey === 'profile'     && <ProfilePanel     />}
     </DashboardLayout>
   )
